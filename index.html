@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e6fd9">
+<title>Suivi Diabète</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{
+  --p:#1e6fd9; --p2:#4f9bff; --pl:#e8f1ff;
+  --bg:#f3f6fb; --card:#fff; --tx:#1b2433; --mut:#6b7689; --bd:#e3e8f0;
+  --ok:#1fa463; --warn:#f29c11; --bad:#e5484d; --grace:#8e4ec6;
+}
+body[data-theme="vert"]{--p:#139a6b;--p2:#3fcf98;--pl:#e4f7ef}
+body[data-theme="violet"]{--p:#7b4fd6;--p2:#a988ff;--pl:#f0eaff}
+body[data-theme="orange"]{--p:#e8710a;--p2:#ffa34d;--pl:#fff1e3}
+body[data-theme="sombre"]{--p:#4f9bff;--p2:#7fb6ff;--pl:#1c2a40;--bg:#0f1520;--card:#18202d;--tx:#e8edf5;--mut:#93a0b5;--bd:#273246}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);
+  padding-bottom:calc(76px + env(safe-area-inset-bottom));min-height:100vh}
+header{background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;padding:calc(18px + env(safe-area-inset-top)) 18px 54px;border-radius:0 0 26px 26px}
+header h1{font-size:15px;font-weight:600;opacity:.9;letter-spacing:.3px}
+header .date{font-size:12px;opacity:.8;margin-top:2px}
+main{padding:0 14px;margin-top:-40px}
+.view{display:none}.view.on{display:block}
+.card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px rgba(20,40,80,.07);border:1px solid var(--bd)}
+.kid{display:flex;align-items:center;gap:14px}
+.avatar{width:64px;height:64px;border-radius:50%;background:var(--pl);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--p);overflow:hidden;flex-shrink:0;border:3px solid var(--pl)}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.kid h2{font-size:20px}.kid .sub{color:var(--mut);font-size:13px;margin-top:3px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:var(--pl);color:var(--p);font-size:11px;font-weight:600;padding:4px 9px;border-radius:20px}
+.sec-t{font-size:13px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin:18px 4px 8px}
+.dev{display:flex;gap:14px;align-items:center}
+.ring{position:relative;width:92px;height:92px;flex-shrink:0}
+.ring svg{transform:rotate(-90deg)}
+.ring .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.ring .big{font-size:22px;font-weight:800;line-height:1}
+.ring .sm{font-size:10px;color:var(--mut);margin-top:2px}
+.dev-info{flex:1;min-width:0}
+.dev-info h3{font-size:16px;display:flex;align-items:center;gap:6px}
+.dev-info .l{font-size:12.5px;color:var(--mut);margin-top:4px}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;margin-top:7px;color:#fff}
+.btn{border:none;border-radius:12px;padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;background:var(--p);color:#fff;font-family:inherit}
+.btn.sec{background:var(--pl);color:var(--p)}
+.btn.bad{background:var(--bad)}
+.btn.full{width:100%;margin-top:12px}
+.btn.sm{padding:7px 10px;font-size:12.5px;border-radius:10px}
+.row{display:flex;gap:8px}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;margin-bottom:8px;font-size:13.5px}
+.alert.r{background:rgba(229,72,77,.12);color:var(--bad)}
+.alert.o{background:rgba(242,156,17,.14);color:#b86e00}
+body[data-theme="sombre"] .alert.o{color:#ffb84d}
+.alert.g{background:rgba(31,164,99,.12);color:var(--ok)}
+.alert b{font-weight:700}
+.cat{margin-bottom:14px}
+.cat-h{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;font-weight:700}
+.cat-h .n{font-size:12px;color:var(--mut);font-weight:500}
+.cat-b{border-top:1px solid var(--bd)}
+.cat.closed .cat-b{display:none}
+.item{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px}
+.item:last-child{border-bottom:none}
+.item .nm{flex:1;min-width:0}
+.item .nm b{display:block;font-size:14.5px}
+.item .nm span{font-size:12px;color:var(--mut)}
+.qty{display:flex;align-items:center;gap:6px}
+.qty button{width:32px;height:32px;border-radius:10px;border:none;background:var(--pl);color:var(--p);font-size:18px;font-weight:700;cursor:pointer}
+.qty .v{min-width:34px;text-align:center;font-weight:800;font-size:17px}
+.qty .v.low{color:var(--bad)}
+.edit{background:none;border:none;color:var(--mut);font-size:16px;cursor:pointer;padding:4px}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--bd);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:10}
+nav button{flex:1;background:none;border:none;color:var(--mut);font-size:10.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;cursor:pointer;font-family:inherit}
+nav button .ic{font-size:21px;line-height:1}
+nav button.on{color:var(--p)}
+.modal-bg{position:fixed;inset:0;background:rgba(10,20,40,.5);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.modal-bg.on{display:flex}
+.modal{background:var(--card);width:100%;max-width:560px;border-radius:22px 22px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.modal h3{font-size:18px;margin-bottom:14px}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--mut);margin:10px 0 5px}
+input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:15px;font-family:inherit}
+.chk{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px}
+.chk input{width:20px;height:20px}
+.hist{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--bd)}
+.hist:last-child{border-bottom:none}
+.hist .ic{width:38px;height:38px;border-radius:12px;background:var(--pl);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.hist b{font-size:14px}.hist div span{display:block;font-size:12px;color:var(--mut);margin-top:2px}
+.empty{text-align:center;color:var(--mut);font-size:14px;padding:18px 0}
+.themes{display:flex;gap:10px;flex-wrap:wrap}
+.th{width:44px;height:44px;border-radius:50%;border:3px solid transparent;cursor:pointer}
+.th.on{border-color:var(--tx)}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat div{background:var(--pl);border-radius:14px;padding:12px}
+.stat b{display:block;font-size:22px;color:var(--p)}
+.stat span{font-size:12px;color:var(--mut)}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--tx);color:var(--card);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:30}
+.toast.on{opacity:1}
+.ord-end{font-size:13px;font-weight:700}
+</style>
+</head>
+<body data-theme="bleu">
+<header>
+  <h1>💙 Suivi Diabète</h1>
+  <div class="date" id="today"></div>
+</header>
+
+<main>
+<!-- ACCUEIL -->
+<section class="view on" id="v-accueil">
+  <div class="card kid" onclick="openKid()">
+    <div class="avatar" id="kAvatar">?</div>
+    <div style="flex:1">
+      <h2 id="kName">Ajouter mon fils</h2>
+      <div class="sub" id="kSub">Touchez pour compléter la fiche</div>
+      <div class="chips" id="kChips"></div>
+    </div>
+  </div>
+
+  <div class="sec-t">En cours</div>
+  <div class="card" id="cCapteur"></div>
+  <div class="card" id="cPod"></div>
+
+  <div class="sec-t">Alertes</div>
+  <div class="card" id="cAlertes"></div>
+
+  <div class="sec-t">Autonomie du stock</div>
+  <div class="card"><div class="stat" id="cAuto"></div></div>
+</section>
+
+<!-- STOCK -->
+<section class="view" id="v-stock">
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div><b style="font-size:17px">Stock</b><div style="font-size:12px;color:var(--mut)">Le rouge = sous le seuil d'alerte</div></div>
+    <button class="btn sm" onclick="openItem()">+ Ajouter</button>
+  </div>
+  <div id="stockList"></div>
+</section>
+
+<!-- ORDONNANCES -->
+<section class="view" id="v-ordo">
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div><b style="font-size:17px">Ordonnances</b><div style="font-size:12px;color:var(--mut)">Fin de validité et prochain passage pharmacie</div></div>
+    <button class="btn sm" onclick="openOrdo()">+ Ajouter</button>
+  </div>
+  <div id="ordoList"></div>
+</section>
+
+<!-- HISTORIQUE -->
+<section class="view" id="v-hist">
+  <div class="card">
+    <b style="font-size:17px">Historique</b>
+    <div style="font-size:12px;color:var(--mut);margin-bottom:6px">Changements de capteur et de pod</div>
+    <div id="histList"></div>
+  </div>
+</section>
+
+<!-- REGLAGES -->
+<section class="view" id="v-reg">
+  <div class="card">
+    <b style="font-size:17px">Thème</b>
+    <div class="themes" style="margin-top:12px" id="themes"></div>
+  </div>
+  <div class="card">
+    <b style="font-size:17px">Durées des dispositifs</b>
+    <label>Capteur Dexcom G7 — durée (jours)</label><input type="number" id="rCapJ" min="1">
+    <label>Capteur — période de grâce (heures)</label><input type="number" id="rCapG" min="0">
+    <label>Pod Omnipod — durée (heures)</label><input type="number" id="rPodH" min="1">
+    <label>Pod — période de grâce (heures)</label><input type="number" id="rPodG" min="0">
+    <label>Alerte péremption / ordonnance (jours avant)</label><input type="number" id="rAlerte" min="1">
+    <button class="btn full" onclick="saveReg()">Enregistrer</button>
+  </div>
+  <div class="card">
+    <b style="font-size:17px">Sauvegarde</b>
+    <div style="font-size:12.5px;color:var(--mut);margin-top:4px">Exporte toutes les données dans un fichier pour les garder ou les passer sur un autre téléphone.</div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn sec" style="flex:1" onclick="exportData()">⬇️ Exporter</button>
+      <button class="btn sec" style="flex:1" onclick="document.getElementById('impFile').click()">⬆️ Importer</button>
+    </div>
+    <input type="file" id="impFile" accept=".json,application/json" style="display:none" onchange="importData(this)">
+    <button class="btn bad full" onclick="openReset()">Tout effacer</button>
+  </div>
+</section>
+</main>
+
+<nav>
+  <button class="on" data-v="accueil"><span class="ic">🏠</span>Accueil</button>
+  <button data-v="stock"><span class="ic">📦</span>Stock</button>
+  <button data-v="ordo"><span class="ic">📄</span>Ordonnances</button>
+  <button data-v="hist"><span class="ic">🕓</span>Historique</button>
+  <button data-v="reg"><span class="ic">⚙️</span>Réglages</button>
+</nav>
+
+<div class="modal-bg" id="modal" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY='suivi-diabete-v1';
+const CATS=['Capteurs','Pompe','Insuline','Glycémie & cétonémie','Resucrage & glucagon','Autre'];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function defaults(){return{
+  enfant:{prenom:'',naissance:'',photo:'',insuline:'',notes:''},
+  capteur:{pose:null},
+  pod:{pose:null},
+  reglages:{capJ:10,capG:12,podH:72,podG:8,alerte:30},
+  stock:[
+    {id:uid(),cat:'Capteurs',nom:'Capteur Dexcom G7',qte:0,unite:'capteurs',seuil:3,per:'',lien:'capteur'},
+    {id:uid(),cat:'Pompe',nom:'Pods Omnipod 5',qte:0,unite:'pods',seuil:10,per:'',lien:'pod'},
+    {id:uid(),cat:'Insuline',nom:'Insuline rapide (flacon)',qte:0,unite:'flacons',seuil:2,per:''},
+    {id:uid(),cat:'Glycémie & cétonémie',nom:'Bandelettes glycémie',qte:0,unite:'bandelettes',seuil:50,per:''},
+    {id:uid(),cat:'Glycémie & cétonémie',nom:'Bandelettes cétonémie',qte:0,unite:'bandelettes',seuil:10,per:''},
+    {id:uid(),cat:'Glycémie & cétonémie',nom:'Lancettes',qte:0,unite:'lancettes',seuil:50,per:''},
+    {id:uid(),cat:'Resucrage & glucagon',nom:'Sucres / resucrage',qte:0,unite:'',seuil:10,per:''},
+    {id:uid(),cat:'Resucrage & glucagon',nom:'Glucagon (Baqsimi / GlucaGen)',qte:0,unite:'',seuil:1,per:''}
+  ],
+  ordos:[], hist:[], theme:'bleu', closed:{}
+}}
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))||defaults()}catch(e){S=defaults()}
+S=Object.assign(defaults(),S);
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1800)}
+const fmtD=d=>new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+const fmtDT=d=>new Date(d).toLocaleString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+const daysTo=d=>Math.ceil((new Date(d).setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/864e5);
+function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function toLocalInput(iso){const d=new Date(iso);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function age(n){if(!n)return'';const b=new Date(n),t=new Date();let a=t.getFullYear()-b.getFullYear();if(t<new Date(t.getFullYear(),b.getMonth(),b.getDate()))a--;return a+' ans'}
+
+/* ---------- Dispositifs ---------- */
+function devState(type){
+  const r=S.reglages, d=S[type];
+  const dureeH= type==='capteur'? r.capJ*24 : r.podH;
+  const graceH= type==='capteur'? r.capG : r.podG;
+  if(!d.pose) return {none:true,dureeH,graceH};
+  const start=new Date(d.pose).getTime(), now=Date.now();
+  const fin=start+dureeH*36e5, finG=fin+graceH*36e5;
+  const restH=(fin-now)/36e5, pct=Math.max(0,Math.min(1,(fin-now)/(dureeH*36e5)));
+  let st='ok',col='var(--ok)',lab='En cours';
+  if(now>=finG){st='exp';col='var(--bad)';lab='Expiré — à changer'}
+  else if(now>=fin){st='grace';col='var(--grace)';lab='Période de grâce'}
+  else if(restH<=24){st='bad';col='var(--bad)';lab='À changer bientôt'}
+  else if(pct<.3){st='warn';col='var(--warn)';lab='Bientôt'}
+  return {start,fin,finG,restH,pct,st,col,lab,dureeH,graceH,graceRest:(finG-now)/36e5};
+}
+function fmtRest(h){
+  if(h<=0)return'0 h';
+  const j=Math.floor(h/24),hh=Math.floor(h%24),m=Math.floor((h*60)%60);
+  if(j>0)return j+' j '+hh+' h';
+  if(hh>0)return hh+' h '+String(m).padStart(2,'0');
+  return m+' min';
+}
+function ring(pct,col,big,sm){
+  const R=40,C=2*Math.PI*R;
+  return `<div class="ring"><svg width="92" height="92"><circle cx="46" cy="46" r="${R}" fill="none" stroke="var(--bd)" stroke-width="9"/>
+  <circle cx="46" cy="46" r="${R}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}"/></svg>
+  <div class="in"><div class="big" style="color:${col}">${big}</div><div class="sm">${sm}</div></div></div>`;
+}
+function renderDev(type){
+  const s=devState(type), el=$(type==='capteur'?'cCapteur':'cPod');
+  const name= type==='capteur'?'📡 Capteur Dexcom G7':'💧 Pod Omnipod 5';
+  if(s.none){
+    el.innerHTML=`<div class="dev">${ring(0,'var(--bd)','—','')}<div class="dev-info"><h3>${name}</h3><div class="l">Aucun ${type==='capteur'?'capteur':'pod'} enregistré</div></div></div>
+    <button class="btn full" onclick="openChange('${type}')">Enregistrer la pose</button>`;return;
+  }
+  let big,sm;
+  if(s.st==='grace'){big=fmtRest(s.graceRest).split(' ').slice(0,2).join(' ');sm='de grâce'}
+  else if(s.st==='exp'){big='0';sm='expiré'}
+  else if(s.restH>=24){big=Math.floor(s.restH/24)+' j';sm=Math.floor(s.restH%24)+' h restantes'}
+  else{big=Math.floor(s.restH)+' h';sm=Math.floor((s.restH*60)%60)+' min'}
+  const pctShow= s.st==='grace'? Math.max(0,s.graceRest/s.graceH) : s.pct;
+  el.innerHTML=`<div class="dev">${ring(pctShow,s.col,big,sm)}
+  <div class="dev-info"><h3>${name}</h3>
+  <div class="l">Posé le ${fmtDT(s.start)}</div>
+  <div class="l">À changer le <b>${fmtDT(s.fin)}</b></div>
+  ${s.graceH?`<div class="l">Fin de grâce : ${fmtDT(s.finG)}</div>`:''}
+  ${type==='pod'&&S.pod.site?`<div class="l">Site : ${esc(S.pod.site)}</div>`:''}
+  ${type==='capteur'&&S.capteur.site?`<div class="l">Site : ${esc(S.capteur.site)}</div>`:''}
+  <span class="badge" style="background:${s.col}">${s.lab}</span></div></div>
+  <button class="btn full" onclick="openChange('${type}')">🔄 ${type==='capteur'?'Nouveau capteur posé':'Nouveau pod posé'}</button>`;
+}
+function openChange(type){
+  const it=S.stock.find(x=>x.lien===type);
+  const sites=type==='capteur'?['Bras gauche','Bras droit','Ventre gauche','Ventre droit','Fesse gauche','Fesse droite']:['Bras gauche','Bras droit','Ventre gauche','Ventre droit','Cuisse gauche','Cuisse droite','Fesse gauche','Fesse droite','Dos'];
+  modal(`<h3>${type==='capteur'?'📡 Nouveau capteur':'💧 Nouveau pod'}</h3>
+  <label>Date et heure de pose</label><input type="datetime-local" id="chDate" value="${nowLocal()}">
+  <label>Emplacement</label><select id="chSite"><option value="">—</option>${sites.map(s=>`<option>${s}</option>`).join('')}</select>
+  <label>Remarque (facultatif)</label><input id="chNote" placeholder="ex : décollé, erreur capteur…">
+  ${it?`<div class="chk"><input type="checkbox" id="chStock" checked><span>Retirer 1 du stock (reste ${it.qte})</span></div>`:''}
+  ${S[type].pose?`<div class="chk"><input type="checkbox" id="chEarly"><span>Changé avant la fin (panne, arraché…)</span></div>`:''}
+  <button class="btn full" onclick="doChange('${type}')">Valider</button>
+  <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
+}
+function doChange(type){
+  const v=$('chDate').value; if(!v){toast('Date manquante');return}
+  const iso=new Date(v).toISOString(), site=$('chSite').value, note=$('chNote').value.trim();
+  const early=$('chEarly')&&$('chEarly').checked;
+  S[type]={pose:iso,site};
+  if($('chStock')&&$('chStock').checked){const it=S.stock.find(x=>x.lien===type);if(it)it.qte=Math.max(0,it.qte-1)}
+  S.hist.unshift({id:uid(),type,date:iso,site,note,early});
+  save();closeModal();renderAll();toast(type==='capteur'?'Capteur enregistré ✅':'Pod enregistré ✅');
+}
+
+/* ---------- Fiche enfant ---------- */
+function renderKid(){
+  const k=S.enfant;
+  $('kName').textContent=k.prenom||'Ajouter mon fils';
+  $('kSub').textContent=k.prenom?[age(k.naissance),k.naissance?'né le '+fmtD(k.naissance):''].filter(Boolean).join(' · '):'Touchez pour compléter la fiche';
+  $('kAvatar').innerHTML=k.photo?`<img src="${k.photo}">`:(k.prenom?esc(k.prenom[0].toUpperCase()):'?');
+  const chips=['DT1','Omnipod 5','Dexcom G7'];if(k.insuline)chips.push(k.insuline);
+  $('kChips').innerHTML=chips.map(c=>`<span class="chip">${esc(c)}</span>`).join('')+(k.notes?`<div style="width:100%;font-size:12px;color:var(--mut);margin-top:4px">${esc(k.notes)}</div>`:'');
+}
+let tmpPhoto=null;
+function openKid(){
+  const k=S.enfant;tmpPhoto=k.photo;
+  modal(`<h3>Fiche de mon fils</h3>
+  <label>Prénom</label><input id="kP" value="${esc(k.prenom)}">
+  <label>Date de naissance</label><input type="date" id="kN" value="${esc(k.naissance)}">
+  <label>Insuline utilisée</label><input id="kI" value="${esc(k.insuline)}" placeholder="ex : NovoRapid, Humalog…">
+  <label>Infos utiles (médecin, hôpital, numéros…)</label><textarea id="kNo" rows="3">${esc(k.notes)}</textarea>
+  <label>Photo</label><input type="file" accept="image/*" onchange="loadPhoto(this)">
+  <button class="btn full" onclick="saveKid()">Enregistrer</button>
+  <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
+}
+function loadPhoto(inp){
+  const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=e=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas'),s=200;c.width=c.height=s;
+    const m=Math.min(img.width,img.height),x=c.getContext('2d');x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s);tmpPhoto=c.toDataURL('image/jpeg',.8);toast('Photo prête')};img.src=e.target.result};
+  r.readAsDataURL(f);
+}
+function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||''};save();closeModal();renderAll()}
+
+/* ---------- Alertes ---------- */
+function alerts(){
+  const a=[],lim=S.reglages.alerte;
+  ['capteur','pod'].forEach(t=>{const s=devState(t);if(s.none)return;const n=t==='capteur'?'Capteur':'Pod';
+    if(s.st==='exp')a.push(['r',`<b>${n} expiré</b> — à changer maintenant`]);
+    else if(s.st==='grace')a.push(['r',`<b>${n} en période de grâce</b> — ${fmtRest(s.graceRest)} restantes`]);
+    else if(s.st==='bad')a.push(['o',`<b>${n}</b> à changer dans ${fmtRest(s.restH)}`]);
+  });
+  S.stock.forEach(i=>{
+    if(i.qte<=i.seuil)a.push([i.qte===0?'r':'o',`<b>${esc(i.nom)}</b> : ${i.qte===0?'plus de stock':'stock bas ('+i.qte+')'}`]);
+    if(i.per){const d=daysTo(i.per);if(d<0)a.push(['r',`<b>${esc(i.nom)}</b> périmé depuis le ${fmtD(i.per)}`]);else if(d<=lim)a.push(['o',`<b>${esc(i.nom)}</b> périme dans ${d} j (${fmtD(i.per)})`])}
+  });
+  S.ordos.forEach(o=>{
+    const fin=ordoFin(o),d=daysTo(fin);
+    if(d<0)a.push(['r',`<b>Ordonnance ${esc(o.titre)}</b> expirée — à renouveler`]);
+    else if(d<=lim)a.push(['o',`<b>Ordonnance ${esc(o.titre)}</b> expire dans ${d} j`]);
+    if(o.pharma){const p=daysTo(o.pharma);if(p>=0&&p<=7)a.push(['o',`<b>Pharmacie</b> : passage prévu ${p===0?"aujourd'hui":'dans '+p+' j'} (${esc(o.titre)})`]);else if(p<0&&p>-30)a.push(['r',`<b>Pharmacie</b> : passage prévu le ${fmtD(o.pharma)} dépassé (${esc(o.titre)})`])}
+  });
+  return a;
+}
+function renderAlerts(){
+  const a=alerts();
+  $('cAlertes').innerHTML=a.length?a.map(([c,t])=>`<div class="alert ${c}"><span>${c==='r'?'⛔':'⚠️'}</span><span>${t}</span></div>`).join(''):`<div class="alert g"><span>✅</span><span>Tout est en ordre</span></div>`;
+  const nb=a.filter(x=>x[0]==='r').length+a.filter(x=>x[0]==='o').length;
+  document.querySelector('nav button[data-v="accueil"] .ic').textContent=nb?'🏠':'🏠';
+}
+function renderAuto(){
+  const cap=S.stock.find(x=>x.lien==='capteur'),pod=S.stock.find(x=>x.lien==='pod'),r=S.reglages;
+  const sc=devState('capteur'),sp=devState('pod');
+  const jc=cap?Math.floor(cap.qte*r.capJ+(sc.none?0:Math.max(0,sc.restH/24))):0;
+  const jp=pod?Math.floor((pod.qte*r.podH+(sp.none?0:Math.max(0,sp.restH)))/24):0;
+  const until=j=>{const d=new Date();d.setDate(d.getDate()+j);return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})};
+  $('cAuto').innerHTML=`<div><b>${jc} j</b><span>Capteurs (${cap?cap.qte:0} en stock)<br>jusqu'au ${until(jc)}</span></div>
+  <div><b>${jp} j</b><span>Pods (${pod?pod.qte:0} en stock)<br>jusqu'au ${until(jp)}</span></div>`;
+}
+
+/* ---------- Stock ---------- */
+function renderStock(){
+  const cats=[...new Set([...CATS,...S.stock.map(i=>i.cat)])];
+  $('stockList').innerHTML=cats.map(c=>{
+    const items=S.stock.filter(i=>i.cat===c);if(!items.length)return'';
+    const low=items.filter(i=>i.qte<=i.seuil).length;
+    return `<div class="card cat ${S.closed[c]?'closed':''}" style="padding:0">
+    <div class="cat-h" onclick="toggleCat('${esc(c)}')"><span>${S.closed[c]?'▸':'▾'} ${esc(c)}</span><span class="n">${items.length} article${items.length>1?'s':''}${low?` · <span style="color:var(--bad)">${low} bas</span>`:''}</span></div>
+    <div class="cat-b">${items.map(i=>{
+      const per=i.per?(()=>{const d=daysTo(i.per);return ` · <span style="color:${d<0?'var(--bad)':d<=S.reglages.alerte?'var(--warn)':'inherit'}">pér. ${fmtD(i.per)}</span>`})():'';
+      return `<div class="item"><div class="nm"><b>${esc(i.nom)}</b><span>Seuil ${i.seuil}${i.unite?' '+esc(i.unite):''}${per}</span></div>
+      <div class="qty"><button onclick="qty('${i.id}',-1)">−</button><span class="v ${i.qte<=i.seuil?'low':''}">${i.qte}</span><button onclick="qty('${i.id}',1)">+</button></div>
+      <button class="edit" onclick="openItem('${i.id}')">✏️</button></div>`}).join('')}</div></div>`}).join('');
+}
+function toggleCat(c){S.closed[c]=!S.closed[c];save();renderStock()}
+function qty(id,d){const i=S.stock.find(x=>x.id===id);i.qte=Math.max(0,i.qte+d);save();renderAll()}
+function openItem(id){
+  const i=id?S.stock.find(x=>x.id===id):{cat:'Autre',nom:'',qte:0,unite:'',seuil:1,per:''};
+  modal(`<h3>${id?'Modifier':'Nouvel article'}</h3>
+  <label>Nom</label><input id="iN" value="${esc(i.nom)}">
+  <label>Catégorie</label><select id="iC">${CATS.map(c=>`<option ${c===i.cat?'selected':''}>${c}</option>`).join('')}</select>
+  <div class="row"><div style="flex:1"><label>Quantité</label><input type="number" id="iQ" value="${i.qte}" min="0"></div>
+  <div style="flex:1"><label>Seuil d'alerte</label><input type="number" id="iS" value="${i.seuil}" min="0"></div></div>
+  <label>Unité</label><input id="iU" value="${esc(i.unite)}" placeholder="boîtes, flacons…">
+  <label>Date de péremption la plus proche</label><input type="date" id="iP" value="${esc(i.per)}">
+  <button class="btn full" onclick="saveItem('${id||''}')">Enregistrer</button>
+  ${id&&!i.lien?`<button class="btn bad full" onclick="delItem('${id}')">Supprimer</button>`:''}
+  <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
+}
+function saveItem(id){
+  const n=$('iN').value.trim();if(!n){toast('Nom manquant');return}
+  const d={cat:$('iC').value,nom:n,qte:Math.max(0,+$('iQ').value||0),seuil:Math.max(0,+$('iS').value||0),unite:$('iU').value.trim(),per:$('iP').value};
+  if(id)Object.assign(S.stock.find(x=>x.id===id),d);else S.stock.push({id:uid(),...d});
+  save();closeModal();renderAll();
+}
+function delItem(id){S.stock=S.stock.filter(x=>x.id!==id);save();closeModal();renderAll()}
+
+/* ---------- Ordonnances ---------- */
+function ordoFin(o){const d=new Date(o.date);d.setMonth(d.getMonth()+(+o.mois||0));return d}
+function renderOrdo(){
+  if(!S.ordos.length){$('ordoList').innerHTML=`<div class="card empty">Aucune ordonnance enregistrée</div>`;return}
+  $('ordoList').innerHTML=[...S.ordos].sort((a,b)=>ordoFin(a)-ordoFin(b)).map(o=>{
+    const fin=ordoFin(o),d=daysTo(fin),col=d<0?'var(--bad)':d<=S.reglages.alerte?'var(--warn)':'var(--ok)';
+    return `<div class="card" onclick="openOrdo('${o.id}')" style="cursor:pointer">
+    <div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:15.5px">📄 ${esc(o.titre)}</b><span class="ord-end" style="color:${col}">${d<0?'Expirée':d+' j'}</span></div>
+    <div style="font-size:12.5px;color:var(--mut);margin-top:5px">${o.medecin?esc(o.medecin)+' · ':''}du ${fmtD(o.date)} au ${fmtD(fin)}</div>
+    ${o.pharma?`<div style="font-size:12.5px;margin-top:4px">💊 Prochain passage pharmacie : <b>${fmtD(o.pharma)}</b></div>`:''}
+    ${o.notes?`<div style="font-size:12.5px;color:var(--mut);margin-top:4px">${esc(o.notes)}</div>`:''}</div>`}).join('');
+}
+function openOrdo(id){
+  const o=id?S.ordos.find(x=>x.id===id):{titre:'',medecin:'',date:new Date().toISOString().slice(0,10),mois:12,pharma:'',notes:''};
+  modal(`<h3>${id?'Modifier':'Nouvelle'} ordonnance</h3>
+  <label>Contenu</label><input id="oT" value="${esc(o.titre)}" placeholder="ex : Capteurs + pods, Insuline…">
+  <label>Médecin / service</label><input id="oM" value="${esc(o.medecin)}">
+  <div class="row"><div style="flex:1"><label>Date</label><input type="date" id="oD" value="${esc(o.date)}"></div>
+  <div style="flex:1"><label>Validité (mois)</label><input type="number" id="oV" value="${o.mois}" min="1"></div></div>
+  <label>Prochain passage pharmacie</label><input type="date" id="oP" value="${esc(o.pharma)}">
+  <label>Remarques</label><input id="oN" value="${esc(o.notes)}">
+  <button class="btn full" onclick="saveOrdo('${id||''}')">Enregistrer</button>
+  ${id?`<button class="btn bad full" onclick="delOrdo('${id}')">Supprimer</button>`:''}
+  <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
+}
+function saveOrdo(id){
+  const t=$('oT').value.trim();if(!t||!$('oD').value){toast('Contenu et date requis');return}
+  const d={titre:t,medecin:$('oM').value.trim(),date:$('oD').value,mois:+$('oV').value||12,pharma:$('oP').value,notes:$('oN').value.trim()};
+  if(id)Object.assign(S.ordos.find(x=>x.id===id),d);else S.ordos.push({id:uid(),...d});
+  save();closeModal();renderAll();
+}
+function delOrdo(id){S.ordos=S.ordos.filter(x=>x.id!==id);save();closeModal();renderAll()}
+
+/* ---------- Historique ---------- */
+function renderHist(){
+  if(!S.hist.length){$('histList').innerHTML=`<div class="empty">Rien pour l'instant</div>`;return}
+  $('histList').innerHTML=S.hist.map(h=>`<div class="hist"><div class="ic">${h.type==='capteur'?'📡':'💧'}</div>
+  <div style="flex:1"><b>${h.type==='capteur'?'Capteur G7':'Pod Omnipod'}${h.early?' <span style="color:var(--bad);font-size:12px">· changé avant la fin</span>':''}</b>
+  <span>${fmtDT(h.date)}${h.site?' · '+esc(h.site):''}</span>${h.note?`<span>${esc(h.note)}</span>`:''}</div>
+  <button class="edit" onclick="delHist('${h.id}')">🗑️</button></div>`).join('');
+}
+function delHist(id){S.hist=S.hist.filter(x=>x.id!==id);save();renderHist()}
+
+/* ---------- Réglages ---------- */
+const THEMES={bleu:'#1e6fd9',vert:'#139a6b',violet:'#7b4fd6',orange:'#e8710a',sombre:'#18202d'};
+function renderReg(){
+  $('themes').innerHTML=Object.entries(THEMES).map(([k,c])=>`<div class="th ${S.theme===k?'on':''}" style="background:${c}" title="${k}" onclick="setTheme('${k}')"></div>`).join('');
+  const r=S.reglages;$('rCapJ').value=r.capJ;$('rCapG').value=r.capG;$('rPodH').value=r.podH;$('rPodG').value=r.podG;$('rAlerte').value=r.alerte;
+}
+function setTheme(k){S.theme=k;document.body.dataset.theme=k;save();renderReg()}
+function saveReg(){S.reglages={capJ:+$('rCapJ').value||10,capG:+$('rCapG').value||0,podH:+$('rPodH').value||72,podG:+$('rPodG').value||0,alerte:+$('rAlerte').value||30};save();renderAll();toast('Réglages enregistrés')}
+function exportData(){
+  const txt=JSON.stringify(S,null,1),name='suivi-diabete-'+new Date().toISOString().slice(0,10)+'.json';
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Fichier exporté')}catch(e){}
+  setTimeout(()=>{modal(`<h3>Sauvegarde</h3><div style="font-size:13px;color:var(--mut)">Si le fichier ne s'est pas téléchargé, copie ce texte et garde-le (notes, mail…).</div>
+  <textarea rows="8" style="margin-top:10px;font-size:11px" readonly>${esc(txt)}</textarea>
+  <button class="btn full" onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(()=>toast('Copié')).catch(()=>toast('Sélectionne et copie à la main'))">📋 Copier</button>
+  <button class="btn sec full" onclick="closeModal()">Fermer</button>`)},300);
+}
+function importData(inp){
+  const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.stock)throw 0;S=Object.assign(defaults(),d);save();document.body.dataset.theme=S.theme;renderAll();toast('Données importées ✅')}catch(err){toast('Fichier invalide')}inp.value=''};
+  r.readAsText(f);
+}
+function openReset(){modal(`<h3>Tout effacer ?</h3><div style="font-size:14px;color:var(--mut)">Fiche, stock, ordonnances et historique seront supprimés. Pense à exporter avant.</div>
+  <button class="btn bad full" onclick="S=defaults();save();document.body.dataset.theme=S.theme;closeModal();renderAll();toast('Données effacées')">Oui, tout effacer</button>
+  <button class="btn sec full" onclick="closeModal()">Annuler</button>`)}
+
+/* ---------- UI ---------- */
+function modal(h){$('modalBox').innerHTML=h;$('modal').classList.add('on')}
+function closeModal(){$('modal').classList.remove('on')}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
+  window.scrollTo(0,0);
+});
+function renderAll(){
+  $('today').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  renderKid();renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderStock();renderOrdo();renderHist();renderReg();
+}
+document.body.dataset.theme=S.theme;
+renderAll();
+if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+setInterval(()=>{renderDev('capteur');renderDev('pod');renderAlerts();renderAuto()},60000);
+</script>
+</body>
+</html>
