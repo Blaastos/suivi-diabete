@@ -155,6 +155,7 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 @keyframes stamp{0%{opacity:0;transform:scale(2.4) translateY(-20px) rotate(-8deg)}100%{opacity:1;transform:scale(1) rotate(var(--r,0deg))}}
 #splash .kanji{position:absolute;right:4%;top:6%;writing-mode:vertical-rl;font-family:"Yuji Syuku",serif;font-size:62px;color:#e5484d;opacity:0;animation:brush .6s 1.55s ease-out forwards;text-shadow:0 0 18px rgba(229,72,77,.45)}
 @keyframes brush{0%{opacity:0;clip-path:inset(0 0 100% 0)}100%{opacity:1;clip-path:inset(0 0 0 0)}}
+#splash .jname{position:absolute;left:4%;top:6%;writing-mode:vertical-rl;font-family:"Yuji Syuku",serif;font-size:46px;color:#fff;letter-spacing:4px;opacity:0;animation:brush .7s 1.75s ease-out forwards;text-shadow:3px 3px 0 var(--sp-acc,#e5484d),0 0 16px rgba(255,255,255,.25)}
 #splash .hanko{position:absolute;left:50%;bottom:7%;transform:translateX(-50%) rotate(-4deg);border:3px solid #e5484d;color:#e5484d;font-family:Bangers,Impact,sans-serif;font-size:26px;letter-spacing:3px;padding:4px 16px 2px;border-radius:8px;opacity:0;animation:hanko .35s 1.95s cubic-bezier(.2,1.8,.4,1) forwards;background:rgba(229,72,77,.08)}
 @keyframes hanko{0%{opacity:0;transform:translateX(-50%) scale(2.2) rotate(-12deg)}100%{opacity:.95;transform:translateX(-50%) scale(1) rotate(-4deg)}}
 #splash .skip{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));right:16px;color:rgba(255,255,255,.45);font-size:12px;font-family:-apple-system,sans-serif}
@@ -172,6 +173,7 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
     <svg class="drop" viewBox="0 0 100 100"><path d="M50 6 C 50 6 18 44 18 64 A32 32 0 0 0 82 64 C 82 44 50 6 50 6 Z" fill="var(--sp-acc,#e5484d)" stroke="#000" stroke-width="5"/><path d="M36 60 A15 15 0 0 0 46 78" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="62" cy="52" r="5" fill="#fff"/></svg>
     <div class="title"><div class="t1" id="spT1"></div><div class="t2" id="spT2"></div></div>
     <div class="kanji">勇気</div>
+    <div class="jname" id="spJName"></div>
     <div class="hanko" id="spName"></div>
   </div>
   <div class="skip">Touchez pour passer</div>
@@ -458,6 +460,7 @@ function openKid(){
   const k=S.enfant;tmpPhoto=k.photo;
   modal(`<h3>Fiche de mon fils</h3>
   <label>Prénom</label><input id="kP" value="${esc(k.prenom)}">
+  <label>Prénom en japonais (katakana)</label><input id="kJp" value="${esc(k.jp||'')}" placeholder="ex : ルカ">
   <label>Date de naissance</label><input type="date" id="kN" value="${esc(k.naissance)}">
   <label>Code patient</label><input id="kCode" value="${esc(k.code||'')}">
   <label>Insuline utilisée</label><input id="kI" value="${esc(k.insuline)}" placeholder="ex : NovoRapid, Humalog…">
@@ -479,7 +482,7 @@ function loadPhoto(inp){
     const m=Math.min(img.width,img.height),x=c.getContext('2d');x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s);tmpPhoto=c.toDataURL('image/jpeg',.8);toast('Photo prête')};img.src=e.target.result};
   r.readAsDataURL(f);
 }
-function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||'',infNom:$('kInfN').value.trim(),infTel:$('kInfT').value.trim(),pedNom:$('kPedN').value.trim(),pedTel:$('kPedT').value.trim(),pedHop:$('kPedH').value.trim(),code:$('kCode').value.trim(),infEmail:$('kInfE').value.trim(),sig:$('kSig').value.trim()};save();closeModal();renderAll()}
+function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||'',infNom:$('kInfN').value.trim(),infTel:$('kInfT').value.trim(),pedNom:$('kPedN').value.trim(),pedTel:$('kPedT').value.trim(),pedHop:$('kPedH').value.trim(),code:$('kCode').value.trim(),jp:$('kJp').value.trim(),infEmail:$('kInfE').value.trim(),sig:$('kSig').value.trim()};save();closeModal();renderAll()}
 
 /* ---------- Alertes ---------- */
 function alerts(){
@@ -858,6 +861,7 @@ function runSplash(force){
   const acc=getComputedStyle(document.documentElement).getPropertyValue('--p').trim()||'#e5484d';
   sp.style.setProperty('--sp-acc',acc);
   letters($('spT1'),'SUIVI',1.0,.07);letters($('spT2'),'DIABÈTE',1.3,.06);
+  const jn=S.enfant.jp||'';$('spJName').textContent=jn;$('spJName').style.display=jn?'':'none';
   const n=S.enfant.prenom;$('spName').textContent=n?n.toUpperCase():'';$('spName').style.display=n?'':'none';
   // restart CSS animations
   sp.style.display='none';void sp.offsetWidth;sp.style.display='flex';
