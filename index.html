@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#1e6fd9">
 <title>Suivi Diabète</title>
 <link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Yuji+Syuku&display=swap" rel="stylesheet">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -130,10 +132,50 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 .sendrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 .sendrow .btn{padding:11px 8px}
 .okbox{display:none;background:rgba(31,164,99,.10);border:1px solid rgba(31,164,99,.4);border-radius:10px;padding:8px 10px;margin-top:8px}
+
+/* ---------- Splash manga ---------- */
+#splash{position:fixed;inset:0;z-index:100;background:#0a0a0c;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer}
+#splash.out{animation:spOut .55s cubic-bezier(.7,0,.3,1) forwards}
+@keyframes spOut{to{transform:translateY(-100%);}}
+#splash canvas{position:absolute;inset:0;width:100%;height:100%}
+#splash .stage{position:relative;width:min(92vw,420px);height:min(92vh,640px);animation:shake .35s .42s linear}
+@keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,4px)}40%{transform:translate(6px,-5px)}60%{transform:translate(-4px,-3px)}80%{transform:translate(4px,3px)}}
+#splash .flash{position:absolute;inset:-50%;background:#fff;opacity:0;animation:flash .5s .38s ease-out}
+@keyframes flash{0%{opacity:.95}100%{opacity:0}}
+#splash .slash{position:absolute;left:-10%;top:16%;width:120%;height:46%;overflow:visible}
+#splash .slash path{stroke-dasharray:1400;stroke-dashoffset:1400;animation:draw .32s .30s cubic-bezier(.6,0,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+#splash .drop{position:absolute;left:50%;top:31%;width:118px;height:118px;margin-left:-59px;opacity:0;animation:slam .5s .55s cubic-bezier(.2,1.6,.4,1) forwards;filter:drop-shadow(6px 6px 0 #000)}
+@keyframes slam{0%{opacity:0;transform:scale(3.2) rotate(-14deg)}60%{opacity:1}100%{opacity:1;transform:scale(1) rotate(0)}}
+#splash .ring{position:absolute;left:50%;top:calc(31% + 59px);width:10px;height:10px;margin:-5px;border-radius:50%;border:4px solid #fff;opacity:0;animation:ring .7s .78s ease-out}
+@keyframes ring{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(36);border-width:1px}}
+#splash .title{position:absolute;left:0;right:0;top:56%;text-align:center;font-family:Bangers,Impact,"Arial Black",sans-serif;letter-spacing:2px;line-height:.95}
+#splash .title span{display:inline-block;opacity:0;color:#fff;-webkit-text-stroke:2px #000;text-shadow:4px 4px 0 var(--sp-acc,#e5484d),7px 7px 0 #000;animation:stamp .28s cubic-bezier(.2,1.8,.4,1) forwards}
+#splash .t1 span{font-size:58px}#splash .t2 span{font-size:68px}
+@keyframes stamp{0%{opacity:0;transform:scale(2.4) translateY(-20px) rotate(-8deg)}100%{opacity:1;transform:scale(1) rotate(var(--r,0deg))}}
+#splash .kanji{position:absolute;right:4%;top:6%;writing-mode:vertical-rl;font-family:"Yuji Syuku",serif;font-size:62px;color:#e5484d;opacity:0;animation:brush .6s 1.55s ease-out forwards;text-shadow:0 0 18px rgba(229,72,77,.45)}
+@keyframes brush{0%{opacity:0;clip-path:inset(0 0 100% 0)}100%{opacity:1;clip-path:inset(0 0 0 0)}}
+#splash .hanko{position:absolute;left:50%;bottom:7%;transform:translateX(-50%) rotate(-4deg);border:3px solid #e5484d;color:#e5484d;font-family:Bangers,Impact,sans-serif;font-size:26px;letter-spacing:3px;padding:4px 16px 2px;border-radius:8px;opacity:0;animation:hanko .35s 1.95s cubic-bezier(.2,1.8,.4,1) forwards;background:rgba(229,72,77,.08)}
+@keyframes hanko{0%{opacity:0;transform:translateX(-50%) scale(2.2) rotate(-12deg)}100%{opacity:.95;transform:translateX(-50%) scale(1) rotate(-4deg)}}
+#splash .skip{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));right:16px;color:rgba(255,255,255,.45);font-size:12px;font-family:-apple-system,sans-serif}
+@media (prefers-reduced-motion:reduce){#splash *{animation-duration:.01s!important;animation-delay:0s!important}}
 .ord-end{font-size:13px;font-weight:700}
 </style>
 </head>
 <body>
+<div id="splash" style="display:none" onclick="endSplash()">
+  <canvas id="spCv"></canvas>
+  <div class="flash"></div>
+  <div class="stage">
+    <svg class="slash" viewBox="0 0 600 300" preserveAspectRatio="none"><path d="M10 250 C 180 190, 360 120, 590 40" stroke="#e5484d" stroke-width="26" stroke-linecap="round" fill="none"/><path d="M40 268 C 210 205, 380 140, 575 70" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".85"/></svg>
+    <div class="ring"></div>
+    <svg class="drop" viewBox="0 0 100 100"><path d="M50 6 C 50 6 18 44 18 64 A32 32 0 0 0 82 64 C 82 44 50 6 50 6 Z" fill="var(--sp-acc,#e5484d)" stroke="#000" stroke-width="5"/><path d="M36 60 A15 15 0 0 0 46 78" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="62" cy="52" r="5" fill="#fff"/></svg>
+    <div class="title"><div class="t1" id="spT1"></div><div class="t2" id="spT2"></div></div>
+    <div class="kanji">勇気</div>
+    <div class="hanko" id="spName"></div>
+  </div>
+  <div class="skip">Touchez pour passer</div>
+</div>
 <header>
   <h1>💙 Suivi Diabète</h1>
   <div class="date" id="today"></div>
@@ -208,6 +250,9 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
   </div>
   <div class="card">
     <b style="font-size:17px">🌗 Affichage</b>
+    <label>Animation manga à l'ouverture</label>
+    <div class="seg" id="spSeg"><button data-s="on">✨ Activée</button><button data-s="off">Désactivée</button></div>
+    <button class="btn sec full" onclick="runSplash(true)">▶ Revoir l'animation</button>
     <label>Clair / sombre</label>
     <div class="seg" id="modeSeg"><button data-m="auto">Auto</button><button data-m="light">☀️ Clair</button><button data-m="dark">🌙 Sombre</button></div>
     <label style="margin-top:14px">Couleur du fond</label>
@@ -649,11 +694,13 @@ function renderReg(){
   $('customBox').style.display=L.theme==='custom'?'flex':'none';$('cust1').value=L.c1;$('cust2').value=L.c2;
   document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===L.mode));
   document.querySelectorAll('#bgSeg button').forEach(b=>b.classList.toggle('on',b.dataset.b===L.bg));
+  document.querySelectorAll('#spSeg button').forEach(b=>b.classList.toggle('on',b.dataset.s===(S.splash===false?'off':'on')));
   $('bgBox').style.display=L.bg==='custom'?'flex':'none';$('bgc').value=L.bgc;
   const r=S.reglages;$('rCapJ').value=r.capJ;$('rCapG').value=r.capG;$('rPodH').value=r.podH;$('rPodG').value=r.podG;$('rAlerte').value=r.alerte;$('rAutoJ').value=r.autoJ;$('rCibleJ').value=r.cibleJ;renderNotifState();
 }
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setLook('mode',b.dataset.m));
 document.querySelectorAll('#bgSeg button').forEach(b=>b.onclick=()=>setLook('bg',b.dataset.b));
+document.querySelectorAll('#spSeg button').forEach(b=>b.onclick=()=>{S.splash=b.dataset.s==='on';save();renderReg()});
 $('cust1').oninput=e=>setLook('c1',e.target.value);$('cust2').oninput=e=>setLook('c2',e.target.value);$('bgc').oninput=e=>setLook('bgc',e.target.value);
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyLook)}catch(e){}
 function saveReg(){S.reglages={capJ:+$('rCapJ').value||10,capG:+$('rCapG').value||0,podH:+$('rPodH').value||72,podG:+$('rPodG').value||0,alerte:+$('rAlerte').value||30,autoJ:+$('rAutoJ').value||30,cibleJ:+$('rCibleJ').value||90};save();renderAll();toast('Réglages enregistrés')}
@@ -802,6 +849,38 @@ function checkNotifs(){
   if(ch)save();
 }
 
+/* ---------- Splash manga ---------- */
+let spRaf=0,spTimer=0;
+function letters(el,txt,d0,step){el.innerHTML=[...txt].map((c,i)=>c===' '?'<span style="width:.35em"> </span>':`<span style="animation-delay:${(d0+i*step).toFixed(2)}s;--r:${((i%3)-1)*3}deg">${esc(c)}</span>`).join('')}
+function runSplash(force){
+  if(!force&&S.splash===false)return;
+  const sp=$('splash');sp.classList.remove('out');
+  const acc=getComputedStyle(document.documentElement).getPropertyValue('--p').trim()||'#e5484d';
+  sp.style.setProperty('--sp-acc',acc);
+  letters($('spT1'),'SUIVI',1.0,.07);letters($('spT2'),'DIABÈTE',1.3,.06);
+  const n=S.enfant.prenom;$('spName').textContent=n?n.toUpperCase():'';$('spName').style.display=n?'':'none';
+  // restart CSS animations
+  sp.style.display='none';void sp.offsetWidth;sp.style.display='flex';
+  const cv=$('spCv'),g=cv.getContext('2d'),dpr=Math.min(2,devicePixelRatio||1);
+  const W=cv.width=innerWidth*dpr,H=cv.height=innerHeight*dpr,cx=W/2,cy=H*.4,R=Math.hypot(W,H);
+  const lines=[...Array(150)].map(()=>({a:Math.random()*Math.PI*2,w:.003+Math.random()*.012,r0:.18+Math.random()*.22}));
+  const t0=performance.now();cancelAnimationFrame(spRaf);
+  (function frame(now){
+    const t=(now-t0)/1000;g.clearRect(0,0,W,H);
+    // halftone
+    if(t>.55){g.fillStyle='rgba(255,255,255,'+Math.min(.10,(t-.55)*.3)+')';const st=16*dpr;
+      for(let y=0;y<H;y+=st)for(let x=(y/st%2)*st/2;x<W;x+=st){const d=Math.hypot(x-cx,y-cy)/R;const r=(1-d)*3.2*dpr;if(r>.3){g.beginPath();g.arc(x,y,r,0,7);g.fill()}}}
+    // speed lines (converge then flicker)
+    const k=t<.4?t/.4:1, fl=t>.4?.55+.45*Math.random():1;
+    g.fillStyle='rgba(255,255,255,'+(.85*fl)+')';
+    lines.forEach(l=>{const r0=R*(1-k*(1-l.r0));g.beginPath();g.moveTo(cx+Math.cos(l.a-l.w)*R,cy+Math.sin(l.a-l.w)*R);
+      g.lineTo(cx+Math.cos(l.a)*r0,cy+Math.sin(l.a)*r0);g.lineTo(cx+Math.cos(l.a+l.w)*R,cy+Math.sin(l.a+l.w)*R);g.fill()});
+    if(t<3.4)spRaf=requestAnimationFrame(frame);
+  })(t0);
+  clearTimeout(spTimer);spTimer=setTimeout(endSplash,3000);
+}
+function endSplash(){const sp=$('splash');if(sp.style.display==='none'||sp.classList.contains('out'))return;clearTimeout(spTimer);sp.classList.add('out');setTimeout(()=>{sp.style.display='none';cancelAnimationFrame(spRaf)},560)}
+
 /* ---------- UI ---------- */
 function modal(h){$('modalBox').innerHTML=h;$('modal').classList.add('on')}
 function closeModal(){$('modal').classList.remove('on')}
@@ -816,6 +895,7 @@ function renderAll(){
 }
 applyLook();
 renderAll();
+runSplash();
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 setInterval(()=>{renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderBanner();checkNotifs()},60000);
 setTimeout(checkNotifs,1500);
