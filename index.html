@@ -719,9 +719,9 @@ function sendVia(kind){
 /* Commande */
 function openCommande(){
   sendCtx={subject:`Commande de matériel — ${S.enfant.prenom||''}`.trim(),done:false,onSent:logCommande};
-  const items=S.stock;
+  const items=S.stock.filter(i=>i.lien);
   modal(`<h3>📨 Commande pour l'infirmière</h3>
-  <div style="font-size:12.5px;color:var(--mut)">Quantités proposées pour tenir ${S.reglages.cibleJ} jours. Mets 0 pour ne pas commander.</div>
+  <div style="font-size:12.5px;color:var(--mut)">Capteurs et pods uniquement. Quantités proposées pour tenir ${S.reglages.cibleJ} jours. Mets 0 pour ne pas commander.</div>
   <div style="margin-top:8px">${items.map(i=>{const a=autonomie(i);return `<div class="oi"><div class="nm">${esc(i.nom)}<span>Stock : ${i.qte}${a!=null?' · ≈ '+a+' j':''}</span></div>
     <input type="number" min="0" class="oq" data-id="${i.id}" value="${suggest(i)}" oninput="buildCmdMsg()"></div>`}).join('')}</div>
   ${msgUI()}
@@ -731,7 +731,7 @@ function openCommande(){
 }
 function cmdLines(){return [...document.querySelectorAll('.oq')].map(x=>[S.stock.find(i=>i.id===x.dataset.id),Math.max(0,+x.value||0)]).filter(([i,q])=>i&&q>0)}
 function buildCmdMsg(){
-  const st=S.stock.filter(i=>i.lien||i.qte>0||autonomie(i)!=null).map(i=>{const a=autonomie(i);return `- ${i.nom} : ${i.qte}${a!=null?' (≈ '+a+' jours)':''}`}).join('\n');
+  const st=S.stock.filter(i=>i.lien).map(i=>{const a=autonomie(i);return `- ${i.nom} : ${i.qte}${a!=null?' (≈ '+a+' jours)':''}`}).join('\n');
   const c=cmdLines().map(([i,q])=>`- ${i.nom} : ${q}${i.unite?' '+i.unite:''}`).join('\n');
   $('msgTxt').value=`${hello()}Je vous contacte pour ${who()}.\n\nVoici son stock actuel :\n${st}\n\n${c?'Pourriez-vous lancer une commande de :\n'+c:'Pourriez-vous lancer une commande de matériel ?'}${sign()}`;
 }
