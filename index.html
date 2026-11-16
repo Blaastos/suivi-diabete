@@ -120,6 +120,16 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 .contact .ic{width:40px;height:40px;border-radius:12px;background:var(--pl);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
 .contact .who{flex:1;min-width:0}.contact .who b{font-size:14.5px;display:block}.contact .who span{font-size:12px;color:var(--mut)}
 .call{background:var(--ok);color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 12px;border-radius:11px;white-space:nowrap}
+.banner{background:linear-gradient(135deg,rgba(229,72,77,.14),rgba(242,156,17,.14));border:1.5px solid var(--bad)!important}
+.banner h4{font-size:15.5px;color:var(--bad);margin-bottom:8px}
+.banner .li{font-size:13.5px;padding:3px 0}
+.oi{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bd)}
+.oi:last-child{border-bottom:none}
+.oi .nm{flex:1;min-width:0;font-size:13.5px}.oi .nm span{display:block;font-size:11.5px;color:var(--mut)}
+.oi input{width:72px;text-align:center;padding:8px}
+.sendrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.sendrow .btn{padding:11px 8px}
+.okbox{display:none;background:rgba(31,164,99,.10);border:1px solid rgba(31,164,99,.4);border-radius:10px;padding:8px 10px;margin-top:8px}
 .ord-end{font-size:13px;font-weight:700}
 </style>
 </head>
@@ -141,6 +151,7 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
     </div>
   </div>
   <div id="kContacts"></div>
+  <div id="cBanner"></div>
 
   <div class="sec-t">En cours</div>
   <div class="card" id="cCapteur"></div>
@@ -159,6 +170,8 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
     <div><b style="font-size:17px">Stock</b><div style="font-size:12px;color:var(--mut)">Le rouge = sous le seuil d'alerte</div></div>
     <button class="btn sm" onclick="openItem()">+ Ajouter</button>
   </div>
+  <button class="btn full" style="margin:0 0 14px" onclick="openCommande()">📨 Préparer une commande pour l'infirmière</button>
+  <div id="cmdList"></div>
   <div id="stockList"></div>
 </section>
 
@@ -208,7 +221,15 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
     <label>Pod Omnipod — durée (heures)</label><input type="number" id="rPodH" min="1">
     <label>Pod — période de grâce (heures)</label><input type="number" id="rPodG" min="0">
     <label>Alerte péremption / ordonnance (jours avant)</label><input type="number" id="rAlerte" min="1">
+    <label>Alerte stock : moins de … jours de traitement</label><input type="number" id="rAutoJ" min="1">
+    <label>Commande : prévoir du matériel pour … jours</label><input type="number" id="rCibleJ" min="1">
     <button class="btn full" onclick="saveReg()">Enregistrer</button>
+  </div>
+  <div class="card">
+    <b style="font-size:17px">🔔 Notifications sur le téléphone</b>
+    <div style="font-size:12.5px;color:var(--mut);margin-top:4px">Moins d'un mois de traitement, capteur ou pod bientôt à changer, panne pas encore déclarée.</div>
+    <div id="notifState" style="font-size:13px;margin-top:10px"></div>
+    <div class="row" style="margin-top:10px"><button class="btn" style="flex:1" onclick="enableNotif()">Activer</button><button class="btn sec" style="flex:1" onclick="testNotif()">Tester</button></div>
   </div>
   <div class="card">
     <b style="font-size:17px">Sauvegarde</b>
@@ -242,7 +263,7 @@ function defaults(){return{
   enfant:{prenom:'',naissance:'',photo:'',insuline:'',notes:'',infNom:'',infTel:'',pedNom:'',pedTel:'',pedHop:''},
   capteur:{pose:null},
   pod:{pose:null},
-  reglages:{capJ:10,capG:12,podH:72,podG:8,alerte:30},
+  reglages:{capJ:10,capG:12,podH:72,podG:8,alerte:30,autoJ:30,cibleJ:90},
   stock:[
     {id:uid(),cat:'Capteurs',nom:'Capteur Dexcom G7',qte:0,unite:'capteurs',seuil:3,per:'',lien:'capteur'},
     {id:uid(),cat:'Pompe',nom:'Pods Omnipod 5',qte:0,unite:'pods',seuil:10,per:'',lien:'pod'},
@@ -253,11 +274,11 @@ function defaults(){return{
     {id:uid(),cat:'Resucrage & glucagon',nom:'Sucres / resucrage',qte:0,unite:'',seuil:10,per:''},
     {id:uid(),cat:'Resucrage & glucagon',nom:'Glucagon (Baqsimi / GlucaGen)',qte:0,unite:'',seuil:1,per:''}
   ],
-  ordos:[], hist:[], look:{}, closed:{}
+  ordos:[], hist:[], look:{}, closed:{}, commandes:[], notified:{}
 }}
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))||defaults()}catch(e){S=defaults()}
-S=Object.assign(defaults(),S);
+S=Object.assign(defaults(),S);S.reglages=Object.assign(defaults().reglages,S.reglages);
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -342,7 +363,8 @@ function openChange(type,panne){
   <div class="dbox" id="dBox" style="display:${panne?'block':'none'}">
     <label>Motif de la panne</label><select id="chMotif">${motifOpts(type)}</select>
     <label>Détails (code erreur, ce qui s'est passé…)</label><input id="chDNote">
-    <div style="font-size:11.5px;color:var(--mut);margin-top:6px">Ancien : posé le ${fmtDT(cur.date)}${cur.lot?' · lot '+esc(cur.lot):''}</div>
+    <div class="chk"><input type="checkbox" id="chDecl"><span>Panne déjà déclarée à l'infirmière</span></div>
+    <div style="font-size:11.5px;color:var(--mut);margin-top:6px">Ancien : posé le ${fmtDT(cur.date)}${cur.lot?' · lot '+esc(cur.lot):''}. Si elle n'est pas déclarée, je te prépare le message juste après.</div>
   </div>`:''}
   <label>Date et heure de pose du nouveau</label><input type="datetime-local" id="chDate" value="${nowLocal()}">
   <label>Emplacement</label><select id="chSite">${siteOpts(type)}</select>
@@ -358,19 +380,20 @@ function doChange(type){
   const iso=new Date(v).toISOString(), site=$('chSite').value;
   const cur=curHist(type);
   if(cur){cur.fin=iso;
-    if($('chDef')&&$('chDef').checked){cur.defect=true;cur.motif=$('chMotif').value;cur.dnote=$('chDNote').value.trim()}}
+    if($('chDef')&&$('chDef').checked){cur.defect=true;cur.motif=$('chMotif').value;cur.dnote=$('chDNote').value.trim();if($('chDecl').checked){cur.declared=true;cur.declDate=new Date().toISOString()}}}
   const nh={id:uid(),type,date:iso,site,ref:$('chRef').value.trim(),lot:$('chLot').value.trim(),note:$('chNote').value.trim()};
   S.hist.unshift(nh);
   S[type]={pose:iso,site,hid:nh.id};
   if($('chStock')&&$('chStock').checked){const it=S.stock.find(x=>x.lien===type);if(it)it.qte=Math.max(0,it.qte-1)}
   save();closeModal();renderAll();toast(type==='capteur'?'Capteur enregistré ✅':'Pod enregistré ✅');
+  if(cur&&cur.defect&&!cur.declared)setTimeout(()=>openDeclare(cur.id),350);
 }
 
 /* ---------- Fiche enfant ---------- */
 function renderKid(){
   const k=S.enfant;
   $('kName').textContent=k.prenom||'Ajouter mon fils';
-  $('kSub').textContent=k.prenom?[age(k.naissance),k.naissance?'né le '+fmtD(k.naissance):''].filter(Boolean).join(' · '):'Touchez pour compléter la fiche';
+  $('kSub').innerHTML=k.prenom?esc([age(k.naissance),k.naissance?'né le '+fmtD(k.naissance):''].filter(Boolean).join(' · '))+(k.code?`<br>Code patient : <b>${esc(k.code)}</b>`:''):'Touchez pour compléter la fiche';
   $('kAvatar').innerHTML=k.photo?`<img src="${k.photo}">`:(k.prenom?esc(k.prenom[0].toUpperCase()):'?');
   const chips=['DT1','Omnipod 5','Dexcom G7'];if(k.insuline)chips.push(k.insuline);
   renderContacts();
@@ -391,12 +414,15 @@ function openKid(){
   modal(`<h3>Fiche de mon fils</h3>
   <label>Prénom</label><input id="kP" value="${esc(k.prenom)}">
   <label>Date de naissance</label><input type="date" id="kN" value="${esc(k.naissance)}">
+  <label>Code patient</label><input id="kCode" value="${esc(k.code||'')}">
   <label>Insuline utilisée</label><input id="kI" value="${esc(k.insuline)}" placeholder="ex : NovoRapid, Humalog…">
   <label>👩‍⚕️ Infirmière — nom</label><input id="kInfN" value="${esc(k.infNom||'')}">
   <label>👩‍⚕️ Infirmière — numéro</label><input type="tel" id="kInfT" value="${esc(k.infTel||'')}" placeholder="06 …">
+  <label>👩‍⚕️ Infirmière — e-mail</label><input type="email" id="kInfE" value="${esc(k.infEmail||'')}">
   <label>🩺 Pédiatre — nom</label><input id="kPedN" value="${esc(k.pedNom||'')}" placeholder="Dr …">
   <label>🩺 Pédiatre — hôpital / service</label><input id="kPedH" value="${esc(k.pedHop||'')}">
   <label>🩺 Pédiatre — numéro</label><input type="tel" id="kPedT" value="${esc(k.pedTel||'')}" placeholder="04 …">
+  <label>Votre prénom (signature des messages)</label><input id="kSig" value="${esc(k.sig||'')}">
   <label>Autres infos utiles</label><textarea id="kNo" rows="3">${esc(k.notes)}</textarea>
   <label>Photo</label><input type="file" accept="image/*" onchange="loadPhoto(this)">
   <button class="btn full" onclick="saveKid()">Enregistrer</button>
@@ -408,7 +434,7 @@ function loadPhoto(inp){
     const m=Math.min(img.width,img.height),x=c.getContext('2d');x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s);tmpPhoto=c.toDataURL('image/jpeg',.8);toast('Photo prête')};img.src=e.target.result};
   r.readAsDataURL(f);
 }
-function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||'',infNom:$('kInfN').value.trim(),infTel:$('kInfT').value.trim(),pedNom:$('kPedN').value.trim(),pedTel:$('kPedT').value.trim(),pedHop:$('kPedH').value.trim()};save();closeModal();renderAll()}
+function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||'',infNom:$('kInfN').value.trim(),infTel:$('kInfT').value.trim(),pedNom:$('kPedN').value.trim(),pedTel:$('kPedT').value.trim(),pedHop:$('kPedH').value.trim(),code:$('kCode').value.trim(),infEmail:$('kInfE').value.trim(),sig:$('kSig').value.trim()};save();closeModal();renderAll()}
 
 /* ---------- Alertes ---------- */
 function alerts(){
@@ -418,8 +444,10 @@ function alerts(){
     else if(s.st==='grace')a.push(['r',`<b>${n} en période de grâce</b> — ${fmtRest(s.graceRest)} restantes`]);
     else if(s.st==='bad')a.push(['o',`<b>${n}</b> à changer dans ${fmtRest(s.restH)}`]);
   });
+  lowAuto().forEach(([i,au])=>a.push([au<7?'r':'o',`<b>${esc(i.nom)}</b> : plus que ${au} j de traitement (jusqu'au ${untilD(au)})`]));
+  S.hist.filter(h=>h.defect&&!h.declared).forEach(h=>a.push(['o',`<b>Panne ${NOM[h.type]}</b> du ${fmtD(h.fin||h.date)} pas encore déclarée à l'infirmière`]));
   S.stock.forEach(i=>{
-    if(i.qte<=i.seuil)a.push([i.qte===0?'r':'o',`<b>${esc(i.nom)}</b> : ${i.qte===0?'plus de stock':'stock bas ('+i.qte+')'}`]);
+    if(i.qte<=i.seuil&&autonomie(i)==null)a.push([i.qte===0?'r':'o',`<b>${esc(i.nom)}</b> : ${i.qte===0?'plus de stock':'stock bas ('+i.qte+')'}`]);
     if(i.per){const d=daysTo(i.per);if(d<0)a.push(['r',`<b>${esc(i.nom)}</b> périmé depuis le ${fmtD(i.per)}`]);else if(d<=lim)a.push(['o',`<b>${esc(i.nom)}</b> périme dans ${d} j (${fmtD(i.per)})`])}
   });
   S.ordos.forEach(o=>{
@@ -456,7 +484,8 @@ function renderStock(){
     <div class="cat-h" onclick="toggleCat('${esc(c)}')"><span>${S.closed[c]?'▸':'▾'} ${esc(c)}</span><span class="n">${items.length} article${items.length>1?'s':''}${low?` · <span style="color:var(--bad)">${low} bas</span>`:''}</span></div>
     <div class="cat-b">${items.map(i=>{
       const per=i.per?(()=>{const d=daysTo(i.per);return ` · <span style="color:${d<0?'var(--bad)':d<=S.reglages.alerte?'var(--warn)':'inherit'}">pér. ${fmtD(i.per)}</span>`})():'';
-      return `<div class="item"><div class="nm"><b>${esc(i.nom)}</b><span>Seuil ${i.seuil}${i.unite?' '+esc(i.unite):''}${per}</span></div>
+      const au=autonomie(i),aus=au==null?'':` · <span style="color:${au<S.reglages.autoJ?'var(--bad)':'inherit'}">≈ ${au} j</span>`;
+      return `<div class="item"><div class="nm"><b>${esc(i.nom)}</b><span>Seuil ${i.seuil}${i.unite?' '+esc(i.unite):''}${aus}${per}</span></div>
       <div class="qty"><button onclick="qty('${i.id}',-1)">−</button><span class="v ${i.qte<=i.seuil?'low':''}">${i.qte}</span><button onclick="qty('${i.id}',1)">+</button></div>
       <button class="edit" onclick="openItem('${i.id}')">✏️</button></div>`}).join('')}</div></div>`}).join('');
 }
@@ -471,13 +500,14 @@ function openItem(id){
   <div style="flex:1"><label>Seuil d'alerte</label><input type="number" id="iS" value="${i.seuil}" min="0"></div></div>
   <label>Unité</label><input id="iU" value="${esc(i.unite)}" placeholder="boîtes, flacons…">
   <label>Date de péremption la plus proche</label><input type="date" id="iP" value="${esc(i.per)}">
+  ${i.lien?`<div style="font-size:12px;color:var(--mut);margin-top:8px">Autonomie calculée automatiquement (${i.lien==='capteur'?S.reglages.capJ+' j':S.reglages.podH+' h'} par unité).</div>`:`<label>Durée d'une unité en jours (facultatif, pour calculer l'autonomie)</label><input type="number" id="iJ" value="${i.jpu||''}" min="0" step="0.5" placeholder="ex : flacon d'insuline ≈ 10">`}
   <button class="btn full" onclick="saveItem('${id||''}')">Enregistrer</button>
   ${id&&!i.lien?`<button class="btn bad full" onclick="delItem('${id}')">Supprimer</button>`:''}
   <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
 }
 function saveItem(id){
   const n=$('iN').value.trim();if(!n){toast('Nom manquant');return}
-  const d={cat:$('iC').value,nom:n,qte:Math.max(0,+$('iQ').value||0),seuil:Math.max(0,+$('iS').value||0),unite:$('iU').value.trim(),per:$('iP').value};
+  const d={cat:$('iC').value,nom:n,qte:Math.max(0,+$('iQ').value||0),seuil:Math.max(0,+$('iS').value||0),unite:$('iU').value.trim(),per:$('iP').value};if($('iJ'))d.jpu=+$('iJ').value||0;
   if(id)Object.assign(S.stock.find(x=>x.id===id),d);else S.stock.push({id:uid(),...d});
   save();closeModal();renderAll();
 }
@@ -541,7 +571,8 @@ function renderHist(){
     <div class="ln">${fmtDT(h.date)}${h.fin?' → '+fmtDT(h.fin):''}${h.site?' · '+esc(h.site):''}</div>
     ${h.ref||h.lot?`<div class="ln">${h.ref?'Réf. '+esc(h.ref):''}${h.ref&&h.lot?' · ':''}${h.lot?'Lot <b style="font-size:12px">'+esc(h.lot)+'</b>':''}</div>`:''}
     ${port?`<div class="ln">${port}</div>`:''}
-    ${h.defect?`<div class="ln" style="color:var(--bad)"><b style="font-size:12px">${esc(h.motif||'Panne')}</b>${h.dnote?' — '+esc(h.dnote):''}</div>`:''}
+    ${h.defect?`<div class="ln" style="color:var(--bad)"><b style="font-size:12px">${esc(h.motif||'Panne')}</b>${h.dnote?' — '+esc(h.dnote):''}</div>
+    <div class="ln">${h.declared?`<span style="color:var(--ok);font-weight:700">✅ Déclarée à l'infirmière${h.declDate?' le '+fmtD(h.declDate):''}</span>`:`<span style="color:var(--warn);font-weight:700">⏳ Pas encore déclarée</span>`}</div>`:''}
     ${h.note?`<div class="ln">${esc(h.note)}</div>`:''}</div></div>`}).join('');
 }
 function openHist(id){
@@ -556,18 +587,20 @@ function openHist(id){
   <div class="dbox" id="dBox" style="display:${h.defect?'block':'none'}">
     <label>Motif</label><select id="hM">${motifOpts(h.type,h.motif)}</select>
     <label>Détails</label><input id="hDN" value="${esc(h.dnote||'')}">
+    <div class="chk"><input type="checkbox" id="hDecl" ${h.declared?'checked':''}><span>Panne déclarée à l'infirmière${h.declDate?' (le '+fmtD(h.declDate)+')':''}</span></div>
+    <button class="btn sec full" onclick="saveHist('${id}',true)">📨 Préparer le message pour l'infirmière</button>
   </div>
   <button class="btn full" onclick="saveHist('${id}')">Enregistrer</button>
   <button class="btn bad full" onclick="delHist('${id}')">Supprimer</button>
   <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
 }
-function saveHist(id){
+function saveHist(id,thenDeclare){
   const h=S.hist.find(x=>x.id===id);const v=$('hD').value;
   if(v){const iso=new Date(v).toISOString();if(S[h.type].hid===id)S[h.type].pose=iso;h.date=iso}
   h.site=$('hS').value;if(S[h.type].hid===id)S[h.type].site=h.site;
   h.ref=$('hR').value.trim();h.lot=$('hL').value.trim();h.note=$('hN').value.trim();
-  h.defect=$('chDef').checked;if(h.defect){h.motif=$('hM').value;h.dnote=$('hDN').value.trim()}else{delete h.motif;delete h.dnote}
-  save();closeModal();renderAll();toast('Modifié ✅');
+  h.defect=$('chDef').checked;if(h.defect){h.motif=$('hM').value;h.dnote=$('hDN').value.trim();const dc=$('hDecl').checked;if(dc&&!h.declared)h.declDate=new Date().toISOString();h.declared=dc;if(!dc)delete h.declDate}else{['motif','dnote','declared','declDate'].forEach(k=>delete h[k])}
+  save();closeModal();renderAll();if(thenDeclare)setTimeout(()=>openDeclare(id),300);else toast('Modifié ✅');
 }
 function delHist(id){const h=S.hist.find(x=>x.id===id);S.hist=S.hist.filter(x=>x.id!==id);
   if(h&&S[h.type].hid===id)S[h.type]={pose:null};save();closeModal();renderAll()}
@@ -617,13 +650,13 @@ function renderReg(){
   document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===L.mode));
   document.querySelectorAll('#bgSeg button').forEach(b=>b.classList.toggle('on',b.dataset.b===L.bg));
   $('bgBox').style.display=L.bg==='custom'?'flex':'none';$('bgc').value=L.bgc;
-  const r=S.reglages;$('rCapJ').value=r.capJ;$('rCapG').value=r.capG;$('rPodH').value=r.podH;$('rPodG').value=r.podG;$('rAlerte').value=r.alerte;
+  const r=S.reglages;$('rCapJ').value=r.capJ;$('rCapG').value=r.capG;$('rPodH').value=r.podH;$('rPodG').value=r.podG;$('rAlerte').value=r.alerte;$('rAutoJ').value=r.autoJ;$('rCibleJ').value=r.cibleJ;renderNotifState();
 }
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setLook('mode',b.dataset.m));
 document.querySelectorAll('#bgSeg button').forEach(b=>b.onclick=()=>setLook('bg',b.dataset.b));
 $('cust1').oninput=e=>setLook('c1',e.target.value);$('cust2').oninput=e=>setLook('c2',e.target.value);$('bgc').oninput=e=>setLook('bgc',e.target.value);
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyLook)}catch(e){}
-function saveReg(){S.reglages={capJ:+$('rCapJ').value||10,capG:+$('rCapG').value||0,podH:+$('rPodH').value||72,podG:+$('rPodG').value||0,alerte:+$('rAlerte').value||30};save();renderAll();toast('Réglages enregistrés')}
+function saveReg(){S.reglages={capJ:+$('rCapJ').value||10,capG:+$('rCapG').value||0,podH:+$('rPodH').value||72,podG:+$('rPodG').value||0,alerte:+$('rAlerte').value||30,autoJ:+$('rAutoJ').value||30,cibleJ:+$('rCibleJ').value||90};save();renderAll();toast('Réglages enregistrés')}
 function exportData(){
   const txt=JSON.stringify(S,null,1),name='suivi-diabete-'+new Date().toISOString().slice(0,10)+'.json';
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Fichier exporté')}catch(e){}
@@ -641,6 +674,134 @@ function openReset(){modal(`<h3>Tout effacer ?</h3><div style="font-size:14px;co
   <button class="btn bad full" onclick="S=defaults();save();applyLook();closeModal();renderAll();toast('Données effacées')">Oui, tout effacer</button>
   <button class="btn sec full" onclick="closeModal()">Annuler</button>`)}
 
+/* ---------- Autonomie / commandes / messages ---------- */
+function untilD(j){const d=new Date();d.setDate(d.getDate()+j);return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}
+function jpu(i){return i.lien==='capteur'?S.reglages.capJ:i.lien==='pod'?S.reglages.podH/24:(+i.jpu||0)}
+function autonomie(i){
+  const u=jpu(i);if(!u)return null;let extra=0;
+  if(i.lien){const s=devState(i.lien);if(!s.none)extra=Math.max(0,s.restH/24)}
+  return Math.floor(i.qte*u+extra);
+}
+function lowAuto(){return S.stock.map(i=>[i,autonomie(i)]).filter(([i,a])=>a!=null&&a<S.reglages.autoJ)}
+function renderBanner(){
+  const l=lowAuto();
+  $('cBanner').innerHTML=l.length?`<div class="card banner"><h4>⚠️ Moins de ${S.reglages.autoJ} jours de traitement</h4>
+  ${l.map(([i,a])=>`<div class="li">• <b>${esc(i.nom)}</b> : ${i.qte} en stock, ≈ ${a} j (jusqu'au ${untilD(a)})</div>`).join('')}
+  <button class="btn full" onclick="openCommande()">📨 Préparer la commande pour l'infirmière</button></div>`:'';
+}
+function suggest(i){
+  const u=jpu(i);
+  if(u){const need=S.reglages.cibleJ-autonomie(i);return need>0?Math.ceil(need/u):0}
+  return i.qte<=i.seuil?Math.max(1,i.seuil*2-i.qte):0;
+}
+function intl(t){let n=String(t||'').replace(/[^\d+]/g,'');if(n.startsWith('+'))return n.slice(1);if(n.startsWith('00'))return n.slice(2);if(n.startsWith('0'))return '33'+n.slice(1);return n}
+function hello(){const k=S.enfant;return `Bonjour${k.infNom?' '+k.infNom.split(' ')[0]:''},\n\n`}
+function who(){const k=S.enfant;return `${k.prenom||'mon fils'}${k.code?' (code patient : '+k.code+')':''}`}
+function sign(){return `\n\nMerci beaucoup,\n${S.enfant.sig||''}`.trimEnd()}
+let sendCtx=null;
+function msgUI(subject){return `<label>Message (modifiable)</label><textarea id="msgTxt" rows="11" style="font-size:13.5px"></textarea>
+  <div class="sendrow">
+   <button class="btn" onclick="sendVia('sms')">💬 SMS</button>
+   <button class="btn" onclick="sendVia('wa')">🟢 WhatsApp</button>
+   <button class="btn" onclick="sendVia('mail')">✉️ E-mail</button>
+   <button class="btn sec" onclick="sendVia('copy')">📋 Copier</button>
+  </div>
+  <div style="font-size:11.5px;color:var(--mut);margin-top:8px">${S.enfant.infTel||S.enfant.infEmail?'Envoi à '+esc([S.enfant.infNom,S.enfant.infTel,S.enfant.infEmail].filter(Boolean).join(' · ')):"Ajoute le numéro / e-mail de l'infirmière dans la fiche de ton fils."}</div>`}
+function sendVia(kind){
+  const t=$('msgTxt').value,k=S.enfant,sub=sendCtx.subject;let url='';
+  if(kind==='sms')url='sms:'+String(k.infTel||'').replace(/[^\d+]/g,'')+'?&body='+encodeURIComponent(t);
+  if(kind==='mail')url='mailto:'+(k.infEmail||'')+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(t);
+  if(kind==='wa')url='https://wa.me/'+intl(k.infTel)+'?text='+encodeURIComponent(t);
+  if(kind==='copy'){navigator.clipboard.writeText(t).then(()=>toast('Message copié')).catch(()=>{$('msgTxt').select();toast('Sélectionne et copie')})}
+  else{if(kind==='wa'){const w=window.open(url,'_blank');if(!w)location.href=url}else location.href=url}
+  if(sendCtx&&sendCtx.onSent&&!sendCtx.done){sendCtx.done=true;sendCtx.onSent(kind)}
+}
+/* Commande */
+function openCommande(){
+  sendCtx={subject:`Commande de matériel — ${S.enfant.prenom||''}`.trim(),done:false,onSent:logCommande};
+  const items=S.stock;
+  modal(`<h3>📨 Commande pour l'infirmière</h3>
+  <div style="font-size:12.5px;color:var(--mut)">Quantités proposées pour tenir ${S.reglages.cibleJ} jours. Mets 0 pour ne pas commander.</div>
+  <div style="margin-top:8px">${items.map(i=>{const a=autonomie(i);return `<div class="oi"><div class="nm">${esc(i.nom)}<span>Stock : ${i.qte}${a!=null?' · ≈ '+a+' j':''}</span></div>
+    <input type="number" min="0" class="oq" data-id="${i.id}" value="${suggest(i)}" oninput="buildCmdMsg()"></div>`}).join('')}</div>
+  ${msgUI()}
+  <button class="btn sec full" onclick="logCommande('manuel');closeModal();toast('Commande enregistrée')">✅ Enregistrer comme envoyée</button>
+  <button class="btn sec full" onclick="closeModal()">Fermer</button>`);
+  buildCmdMsg();
+}
+function cmdLines(){return [...document.querySelectorAll('.oq')].map(x=>[S.stock.find(i=>i.id===x.dataset.id),Math.max(0,+x.value||0)]).filter(([i,q])=>i&&q>0)}
+function buildCmdMsg(){
+  const st=S.stock.filter(i=>i.lien||i.qte>0||autonomie(i)!=null).map(i=>{const a=autonomie(i);return `- ${i.nom} : ${i.qte}${a!=null?' (≈ '+a+' jours)':''}`}).join('\n');
+  const c=cmdLines().map(([i,q])=>`- ${i.nom} : ${q}${i.unite?' '+i.unite:''}`).join('\n');
+  $('msgTxt').value=`${hello()}Je vous contacte pour ${who()}.\n\nVoici son stock actuel :\n${st}\n\n${c?'Pourriez-vous lancer une commande de :\n'+c:'Pourriez-vous lancer une commande de matériel ?'}${sign()}`;
+}
+function logCommande(via){
+  if(sendCtx&&sendCtx.logged)return;const l=cmdLines();if(!l.length)return;
+  S.commandes.unshift({id:uid(),date:new Date().toISOString(),via,items:l.map(([i,q])=>({sid:i.id,nom:i.nom,q})),statut:'envoyee'});
+  if(sendCtx)sendCtx.logged=true;save();renderCmd();
+}
+function renderCmd(){
+  const l=S.commandes.filter(c=>c.statut==='envoyee');
+  $('cmdList').innerHTML=l.length?`<div class="card"><b style="font-size:15.5px">🚚 Commandes en attente</b>${l.map(c=>`<div class="oi"><div class="nm">Envoyée le ${fmtD(c.date)}<span>${c.items.map(x=>esc(x.nom)+' × '+x.q).join(' · ')}</span></div>
+   <button class="btn sm" onclick="openRecu('${c.id}')">📦 Reçue</button><button class="edit" onclick="delCmd('${c.id}')">🗑️</button></div>`).join('')}</div>`:'';
+}
+function openRecu(id){
+  const c=S.commandes.find(x=>x.id===id);
+  modal(`<h3>📦 Commande reçue</h3><div style="font-size:12.5px;color:var(--mut)">Corrige si tu n'as pas tout reçu : ça s'ajoute au stock.</div>
+  ${c.items.map((x,n)=>`<div class="oi"><div class="nm">${esc(x.nom)}</div><input type="number" min="0" class="rq" data-n="${n}" value="${x.q}"></div>`).join('')}
+  <button class="btn full" onclick="doRecu('${id}')">Ajouter au stock</button><button class="btn sec full" onclick="closeModal()">Annuler</button>`);
+}
+function doRecu(id){
+  const c=S.commandes.find(x=>x.id===id);
+  document.querySelectorAll('.rq').forEach(e=>{const x=c.items[+e.dataset.n],q=Math.max(0,+e.value||0);const it=S.stock.find(i=>i.id===x.sid)||S.stock.find(i=>i.nom===x.nom);if(it)it.qte+=q;x.recu=q});
+  c.statut='recue';c.recuLe=new Date().toISOString();save();closeModal();renderAll();toast('Stock mis à jour ✅');
+}
+function delCmd(id){S.commandes=S.commandes.filter(x=>x.id!==id);save();renderCmd()}
+/* Déclaration de panne */
+function openDeclare(id){
+  const h=S.hist.find(x=>x.id===id);if(!h)return;
+  sendCtx={subject:`Déclaration de panne ${NOM[h.type]} — ${S.enfant.prenom||''}`.trim(),done:false,onSent:()=>{h.declared=true;h.declDate=new Date().toISOString();save();renderAll()}};
+  modal(`<h3>📨 Déclarer la panne à l'infirmière</h3>${msgUI()}
+  <button class="btn sec full" onclick="sendCtx.onSent();closeModal();toast('Marquée comme déclarée ✅')">✅ Marquer comme déclarée</button>
+  <button class="btn sec full" onclick="closeModal()">Plus tard</button>`);
+  const nm=h.type==='capteur'?'capteur Dexcom G7':'pod Omnipod 5';
+  $('msgTxt').value=`${hello()}Je vous signale une panne de ${nm} pour ${who()}.\n\n- Posé le : ${fmtDT(h.date)}\n- Retiré le : ${h.fin?fmtDT(h.fin):'—'}${h.fin?' (porté '+fmtRest(hDuree(h))+')':''}\n- Motif : ${h.motif||'—'}${h.dnote?'\n- Détails : '+h.dnote:''}${h.ref?'\n- Référence : '+h.ref:''}${h.lot?'\n- N° de lot : '+h.lot:''}${h.site?'\n- Emplacement : '+h.site:''}${sign()}`;
+}
+/* Notifications */
+function renderNotifState(){
+  const e=$('notifState');if(!e)return;
+  if(!('Notification' in window)){e.innerHTML='<span style="color:var(--bad)">Pas disponible ici. Sur iPhone, installe d\'abord l\'appli sur l\'écran d\'accueil.</span>';return}
+  const p=Notification.permission;
+  e.innerHTML=p==='granted'?'<span style="color:var(--ok);font-weight:700">✅ Activées</span>':p==='denied'?'<span style="color:var(--bad)">Bloquées : autorise-les dans les réglages du téléphone.</span>':'Pas encore activées.';
+}
+async function enableNotif(){
+  if(!('Notification' in window)){toast('Notifications indisponibles');return}
+  try{await Notification.requestPermission()}catch(e){}
+  renderNotifState();if(Notification.permission==='granted'){S.notified={};save();checkNotifs()}
+}
+function notify(title,body,tag){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const o={body,tag,icon:'icon-192.png',badge:'icon-192.png'};
+  if(navigator.serviceWorker&&navigator.serviceWorker.controller)navigator.serviceWorker.ready.then(r=>r.showNotification(title,o)).catch(()=>{try{new Notification(title,o)}catch(e){}});
+  else{try{new Notification(title,o)}catch(e){}}
+}
+function testNotif(){if(!('Notification' in window)||Notification.permission!=='granted'){toast("Active d'abord les notifications");return}notify('Suivi Diabète','Les notifications fonctionnent 👍','test')}
+function checkNotifs(){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const today=new Date().toISOString().slice(0,10),N=S.notified||(S.notified={});let ch=false;
+  const once=(k,t,b)=>{if(N[k])return;N[k]=today;ch=true;notify(t,b,k)};
+  const daily=(k,t,b)=>{if(N[k]===today)return;N[k]=today;ch=true;notify(t,b,k)};
+  const low=lowAuto();
+  if(low.length)daily('auto','⚠️ Moins de '+S.reglages.autoJ+' jours de traitement',low.map(([i,a])=>i.nom+' : '+a+' j').join(' · ')+' — pense à commander.');
+  ['capteur','pod'].forEach(t=>{const s=devState(t);if(s.none)return;const n=t==='capteur'?'Capteur G7':'Pod';
+    if(s.st==='exp')once(t+s.start+'exp',n+' expiré','À changer maintenant.');
+    else if(s.st==='grace')once(t+s.start+'gr',n+' en période de grâce','Plus que '+fmtRest(s.graceRest)+'.');
+    else if(s.restH<=12)once(t+s.start+'12',n+' à changer bientôt','Dans '+fmtRest(s.restH)+'.');});
+  const nd=S.hist.filter(h=>h.defect&&!h.declared).length;
+  if(nd)daily('decl','Panne à déclarer',nd+' panne(s) pas encore déclarée(s) à l\'infirmière.');
+  if(ch)save();
+}
+
 /* ---------- UI ---------- */
 function modal(h){$('modalBox').innerHTML=h;$('modal').classList.add('on')}
 function closeModal(){$('modal').classList.remove('on')}
@@ -651,12 +812,13 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 });
 function renderAll(){
   $('today').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  renderKid();renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderStock();renderOrdo();renderHist();renderReg();
+  renderKid();renderBanner();renderCmd();renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderStock();renderOrdo();renderHist();renderReg();
 }
 applyLook();
 renderAll();
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{})}
-setInterval(()=>{renderDev('capteur');renderDev('pod');renderAlerts();renderAuto()},60000);
+setInterval(()=>{renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderBanner();checkNotifs()},60000);
+setTimeout(checkNotifs,1500);
 </script>
 </body>
 </html>
