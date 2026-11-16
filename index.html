@@ -100,6 +100,26 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 .stat span{font-size:12px;color:var(--mut)}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--tx);color:var(--card);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:30}
 .toast.on{opacity:1}
+.aura-ok{border-color:var(--ok)!important;animation:auraOk 2.8s ease-in-out infinite}
+.aura-bad{border-color:var(--bad)!important;animation:auraBad 2.2s ease-in-out infinite}
+@keyframes auraOk{0%,100%{box-shadow:0 0 0 1px var(--ok),0 0 10px 1px rgba(31,164,99,.35)}50%{box-shadow:0 0 0 2px var(--ok),0 0 22px 5px rgba(31,164,99,.55)}}
+@keyframes auraBad{0%,100%{box-shadow:0 0 0 1px var(--bad),0 0 10px 1px rgba(229,72,77,.35)}50%{box-shadow:0 0 0 2px var(--bad),0 0 22px 5px rgba(229,72,77,.55)}}
+.h-ok{border:1.5px solid var(--ok);box-shadow:0 0 12px rgba(31,164,99,.30)}
+.h-bad{border:1.5px solid var(--bad);box-shadow:0 0 12px rgba(229,72,77,.35)}
+.hcard{background:var(--card);border-radius:14px;padding:12px;margin-bottom:12px;display:flex;gap:12px;cursor:pointer}
+.hcard .ic{width:40px;height:40px;border-radius:12px;background:var(--pl);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.hcard b{font-size:14.5px}.hcard .ln{font-size:12px;color:var(--mut);margin-top:2px}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;color:#fff;margin-left:4px;vertical-align:middle}
+.filt{display:flex;gap:6px;overflow-x:auto;margin:10px 0 12px}
+.filt button{flex:none;padding:7px 12px;border-radius:20px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit}
+.filt button.on{background:var(--p);color:var(--pt,#fff);border-color:var(--p)}
+.dbox{display:none;background:rgba(229,72,77,.08);border:1px solid rgba(229,72,77,.35);border-radius:12px;padding:4px 12px 12px;margin-top:10px}
+.lotline{font-size:12px;color:var(--mut);margin-top:3px}
+.contact{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--bd)}
+.contact:last-child{border-bottom:none}
+.contact .ic{width:40px;height:40px;border-radius:12px;background:var(--pl);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.contact .who{flex:1;min-width:0}.contact .who b{font-size:14.5px;display:block}.contact .who span{font-size:12px;color:var(--mut)}
+.call{background:var(--ok);color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 12px;border-radius:11px;white-space:nowrap}
 .ord-end{font-size:13px;font-weight:700}
 </style>
 </head>
@@ -120,6 +140,7 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
       <div class="chips" id="kChips"></div>
     </div>
   </div>
+  <div id="kContacts"></div>
 
   <div class="sec-t">En cours</div>
   <div class="card" id="cCapteur"></div>
@@ -154,9 +175,11 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 <section class="view" id="v-hist">
   <div class="card">
     <b style="font-size:17px">Historique</b>
-    <div style="font-size:12px;color:var(--mut);margin-bottom:6px">Changements de capteur et de pod</div>
-    <div id="histList"></div>
+    <div style="font-size:12px;color:var(--mut)">Touchez une ligne pour la modifier ou la marquer défectueuse</div>
+    <div class="stat" id="histStat" style="margin-top:12px"></div>
   </div>
+  <div class="filt" id="histFilt"></div>
+  <div id="histList"></div>
 </section>
 
 <!-- REGLAGES -->
@@ -216,7 +239,7 @@ const KEY='suivi-diabete-v1';
 const CATS=['Capteurs','Pompe','Insuline','Glycémie & cétonémie','Resucrage & glucagon','Autre'];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 function defaults(){return{
-  enfant:{prenom:'',naissance:'',photo:'',insuline:'',notes:''},
+  enfant:{prenom:'',naissance:'',photo:'',insuline:'',notes:'',infNom:'',infTel:'',pedNom:'',pedTel:'',pedHop:''},
   capteur:{pose:null},
   pod:{pose:null},
   reglages:{capJ:10,capG:12,podH:72,podG:8,alerte:30},
@@ -275,13 +298,22 @@ function ring(pct,col,big,sm){
   <circle cx="46" cy="46" r="${R}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}"/></svg>
   <div class="in"><div class="big" style="color:${col}">${big}</div><div class="sm">${sm}</div></div></div>`;
 }
+const MOTIFS={capteur:['Erreur / panne capteur','Perte de signal','Décollé / arraché','Valeurs incohérentes','Échec du démarrage','Autre'],
+  pod:['Occlusion','Erreur pod / alarme','Décollé / arraché','Échec amorçage','Perte de communication','Autre']};
+const NOM={capteur:'Capteur G7',pod:'Pod Omnipod'};
+function curHist(type){const d=S[type];if(!d.pose)return null;let h=d.hid&&S.hist.find(x=>x.id===d.hid);
+  if(!h){h=S.hist.find(x=>x.type===type&&x.date===d.pose);if(h)d.hid=h.id}return h||null}
+function lastLot(type){const h=S.hist.find(x=>x.type===type&&(x.lot||x.ref));return h?{lot:h.lot||'',ref:h.ref||''}:{lot:'',ref:''}}
 function renderDev(type){
   const s=devState(type), el=$(type==='capteur'?'cCapteur':'cPod');
   const name= type==='capteur'?'📡 Capteur Dexcom G7':'💧 Pod Omnipod 5';
+  el.classList.remove('aura-ok','aura-bad');
   if(s.none){
     el.innerHTML=`<div class="dev">${ring(0,'var(--bd)','—','')}<div class="dev-info"><h3>${name}</h3><div class="l">Aucun ${type==='capteur'?'capteur':'pod'} enregistré</div></div></div>
     <button class="btn full" onclick="openChange('${type}')">Enregistrer la pose</button>`;return;
   }
+  el.classList.add(s.st==='grace'||s.st==='exp'?'aura-bad':'aura-ok');
+  const h=curHist(type)||{};
   let big,sm;
   if(s.st==='grace'){big=fmtRest(s.graceRest).split(' ').slice(0,2).join(' ');sm='de grâce'}
   else if(s.st==='exp'){big='0';sm='expiré'}
@@ -293,30 +325,44 @@ function renderDev(type){
   <div class="l">Posé le ${fmtDT(s.start)}</div>
   <div class="l">À changer le <b>${fmtDT(s.fin)}</b></div>
   ${s.graceH?`<div class="l">Fin de grâce : ${fmtDT(s.finG)}</div>`:''}
-  ${type==='pod'&&S.pod.site?`<div class="l">Site : ${esc(S.pod.site)}</div>`:''}
-  ${type==='capteur'&&S.capteur.site?`<div class="l">Site : ${esc(S.capteur.site)}</div>`:''}
+  ${S[type].site?`<div class="l">Site : ${esc(S[type].site)}</div>`:''}
+  ${h.ref||h.lot?`<div class="l">${h.ref?'Réf. '+esc(h.ref):''}${h.ref&&h.lot?' · ':''}${h.lot?'Lot '+esc(h.lot):''}</div>`:''}
   <span class="badge" style="background:${s.col}">${s.lab}</span></div></div>
-  <button class="btn full" onclick="openChange('${type}')">🔄 ${type==='capteur'?'Nouveau capteur posé':'Nouveau pod posé'}</button>`;
+  <button class="btn full" onclick="openChange('${type}')">🔄 ${type==='capteur'?'Nouveau capteur posé':'Nouveau pod posé'}</button>
+  <button class="btn sec full" style="margin-top:8px;color:var(--bad)" onclick="openChange('${type}',true)">⚠️ En panne — changer maintenant</button>`;
 }
-function openChange(type){
-  const it=S.stock.find(x=>x.lien===type);
-  const sites=type==='capteur'?['Bras gauche','Bras droit','Ventre gauche','Ventre droit','Fesse gauche','Fesse droite']:['Bras gauche','Bras droit','Ventre gauche','Ventre droit','Cuisse gauche','Cuisse droite','Fesse gauche','Fesse droite','Dos'];
+function siteOpts(type,sel){const l=type==='capteur'?['Bras gauche','Bras droit','Ventre gauche','Ventre droit','Fesse gauche','Fesse droite']:['Bras gauche','Bras droit','Ventre gauche','Ventre droit','Cuisse gauche','Cuisse droite','Fesse gauche','Fesse droite','Dos'];
+  if(sel&&!l.includes(sel))l.push(sel);return `<option value="">—</option>`+l.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('')}
+function motifOpts(type,sel){return MOTIFS[type].map(m=>`<option ${m===sel?'selected':''}>${m}</option>`).join('')}
+function toggleD(on){$('dBox').style.display=on?'block':'none'}
+function openChange(type,panne){
+  const it=S.stock.find(x=>x.lien===type), L=lastLot(type), cur=curHist(type);
   modal(`<h3>${type==='capteur'?'📡 Nouveau capteur':'💧 Nouveau pod'}</h3>
-  <label>Date et heure de pose</label><input type="datetime-local" id="chDate" value="${nowLocal()}">
-  <label>Emplacement</label><select id="chSite"><option value="">—</option>${sites.map(s=>`<option>${s}</option>`).join('')}</select>
-  <label>Remarque (facultatif)</label><input id="chNote" placeholder="ex : décollé, erreur capteur…">
+  ${cur?`<div class="chk" style="margin-top:0"><input type="checkbox" id="chDef" ${panne?'checked':''} onchange="toggleD(this.checked)"><span><b>L'ancien était défectueux</b> (changé en avance)</span></div>
+  <div class="dbox" id="dBox" style="display:${panne?'block':'none'}">
+    <label>Motif de la panne</label><select id="chMotif">${motifOpts(type)}</select>
+    <label>Détails (code erreur, ce qui s'est passé…)</label><input id="chDNote">
+    <div style="font-size:11.5px;color:var(--mut);margin-top:6px">Ancien : posé le ${fmtDT(cur.date)}${cur.lot?' · lot '+esc(cur.lot):''}</div>
+  </div>`:''}
+  <label>Date et heure de pose du nouveau</label><input type="datetime-local" id="chDate" value="${nowLocal()}">
+  <label>Emplacement</label><select id="chSite">${siteOpts(type)}</select>
+  <div class="row"><div style="flex:1"><label>Référence</label><input id="chRef" value="${esc(L.ref)}" placeholder="REF"></div>
+  <div style="flex:1"><label>N° de lot</label><input id="chLot" value="${esc(L.lot)}" placeholder="LOT"></div></div>
+  <label>Remarque (facultatif)</label><input id="chNote">
   ${it?`<div class="chk"><input type="checkbox" id="chStock" checked><span>Retirer 1 du stock (reste ${it.qte})</span></div>`:''}
-  ${S[type].pose?`<div class="chk"><input type="checkbox" id="chEarly"><span>Changé avant la fin (panne, arraché…)</span></div>`:''}
   <button class="btn full" onclick="doChange('${type}')">Valider</button>
   <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
 }
 function doChange(type){
   const v=$('chDate').value; if(!v){toast('Date manquante');return}
-  const iso=new Date(v).toISOString(), site=$('chSite').value, note=$('chNote').value.trim();
-  const early=$('chEarly')&&$('chEarly').checked;
-  S[type]={pose:iso,site};
+  const iso=new Date(v).toISOString(), site=$('chSite').value;
+  const cur=curHist(type);
+  if(cur){cur.fin=iso;
+    if($('chDef')&&$('chDef').checked){cur.defect=true;cur.motif=$('chMotif').value;cur.dnote=$('chDNote').value.trim()}}
+  const nh={id:uid(),type,date:iso,site,ref:$('chRef').value.trim(),lot:$('chLot').value.trim(),note:$('chNote').value.trim()};
+  S.hist.unshift(nh);
+  S[type]={pose:iso,site,hid:nh.id};
   if($('chStock')&&$('chStock').checked){const it=S.stock.find(x=>x.lien===type);if(it)it.qte=Math.max(0,it.qte-1)}
-  S.hist.unshift({id:uid(),type,date:iso,site,note,early});
   save();closeModal();renderAll();toast(type==='capteur'?'Capteur enregistré ✅':'Pod enregistré ✅');
 }
 
@@ -327,7 +373,17 @@ function renderKid(){
   $('kSub').textContent=k.prenom?[age(k.naissance),k.naissance?'né le '+fmtD(k.naissance):''].filter(Boolean).join(' · '):'Touchez pour compléter la fiche';
   $('kAvatar').innerHTML=k.photo?`<img src="${k.photo}">`:(k.prenom?esc(k.prenom[0].toUpperCase()):'?');
   const chips=['DT1','Omnipod 5','Dexcom G7'];if(k.insuline)chips.push(k.insuline);
+  renderContacts();
   $('kChips').innerHTML=chips.map(c=>`<span class="chip">${esc(c)}</span>`).join('')+(k.notes?`<div style="width:100%;font-size:12px;color:var(--mut);margin-top:4px">${esc(k.notes)}</div>`:'');
+}
+function telHref(t){return 'tel:'+String(t).replace(/[^\d+]/g,'')}
+function renderContacts(){
+  const k=S.enfant,c=[];
+  if(k.infNom||k.infTel)c.push(['👩‍⚕️','Infirmière',k.infNom,'',k.infTel]);
+  if(k.pedNom||k.pedTel)c.push(['🩺','Pédiatre',k.pedNom,k.pedHop,k.pedTel]);
+  $('kContacts').innerHTML=c.length?`<div class="card" style="padding:4px 16px">${c.map(([ic,role,nom,hop,tel])=>`<div class="contact"><div class="ic">${ic}</div>
+    <div class="who"><b>${esc(nom||role)}</b><span>${role}${hop?' · '+esc(hop):''}${tel?'<br>'+esc(tel):''}</span></div>
+    ${tel?`<a class="call" href="${telHref(tel)}">📞 Appeler</a>`:''}</div>`).join('')}</div>`:'';
 }
 let tmpPhoto=null;
 function openKid(){
@@ -336,7 +392,12 @@ function openKid(){
   <label>Prénom</label><input id="kP" value="${esc(k.prenom)}">
   <label>Date de naissance</label><input type="date" id="kN" value="${esc(k.naissance)}">
   <label>Insuline utilisée</label><input id="kI" value="${esc(k.insuline)}" placeholder="ex : NovoRapid, Humalog…">
-  <label>Infos utiles (médecin, hôpital, numéros…)</label><textarea id="kNo" rows="3">${esc(k.notes)}</textarea>
+  <label>👩‍⚕️ Infirmière — nom</label><input id="kInfN" value="${esc(k.infNom||'')}">
+  <label>👩‍⚕️ Infirmière — numéro</label><input type="tel" id="kInfT" value="${esc(k.infTel||'')}" placeholder="06 …">
+  <label>🩺 Pédiatre — nom</label><input id="kPedN" value="${esc(k.pedNom||'')}" placeholder="Dr …">
+  <label>🩺 Pédiatre — hôpital / service</label><input id="kPedH" value="${esc(k.pedHop||'')}">
+  <label>🩺 Pédiatre — numéro</label><input type="tel" id="kPedT" value="${esc(k.pedTel||'')}" placeholder="04 …">
+  <label>Autres infos utiles</label><textarea id="kNo" rows="3">${esc(k.notes)}</textarea>
   <label>Photo</label><input type="file" accept="image/*" onchange="loadPhoto(this)">
   <button class="btn full" onclick="saveKid()">Enregistrer</button>
   <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
@@ -347,7 +408,7 @@ function loadPhoto(inp){
     const m=Math.min(img.width,img.height),x=c.getContext('2d');x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s);tmpPhoto=c.toDataURL('image/jpeg',.8);toast('Photo prête')};img.src=e.target.result};
   r.readAsDataURL(f);
 }
-function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||''};save();closeModal();renderAll()}
+function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||'',infNom:$('kInfN').value.trim(),infTel:$('kInfT').value.trim(),pedNom:$('kPedN').value.trim(),pedTel:$('kPedT').value.trim(),pedHop:$('kPedH').value.trim()};save();closeModal();renderAll()}
 
 /* ---------- Alertes ---------- */
 function alerts(){
@@ -456,14 +517,60 @@ function saveOrdo(id){
 function delOrdo(id){S.ordos=S.ordos.filter(x=>x.id!==id);save();closeModal();renderAll()}
 
 /* ---------- Historique ---------- */
+let hFilt='tous';
+function hDuree(h){if(!h.fin)return null;return (new Date(h.fin)-new Date(h.date))/36e5}
 function renderHist(){
-  if(!S.hist.length){$('histList').innerHTML=`<div class="empty">Rien pour l'instant</div>`;return}
-  $('histList').innerHTML=S.hist.map(h=>`<div class="hist"><div class="ic">${h.type==='capteur'?'📡':'💧'}</div>
-  <div style="flex:1"><b>${h.type==='capteur'?'Capteur G7':'Pod Omnipod'}${h.early?' <span style="color:var(--bad);font-size:12px">· changé avant la fin</span>':''}</b>
-  <span>${fmtDT(h.date)}${h.site?' · '+esc(h.site):''}</span>${h.note?`<span>${esc(h.note)}</span>`:''}</div>
-  <button class="edit" onclick="delHist('${h.id}')">🗑️</button></div>`).join('');
+  const st=t=>{const a=S.hist.filter(h=>h.type===t),d=a.filter(h=>h.defect).length;return{n:a.length,d,p:a.length?Math.round(d/a.length*100):0}};
+  const c=st('capteur'),p=st('pod');
+  $('histStat').innerHTML=`<div><b>${c.d} <small style="font-size:13px;color:var(--mut)">/ ${c.n}</small></b><span>Capteurs défectueux${c.n?' ('+c.p+' %)':''}</span></div>
+  <div><b>${p.d} <small style="font-size:13px;color:var(--mut)">/ ${p.n}</small></b><span>Pods défectueux${p.n?' ('+p.p+' %)':''}</span></div>`;
+  const F={tous:'Tous',capteur:'📡 Capteurs',pod:'💧 Pods',defect:'⚠️ Défectueux'};
+  $('histFilt').innerHTML=Object.entries(F).map(([k,l])=>`<button class="${hFilt===k?'on':''}" onclick="hFilt='${k}';renderHist()">${l}</button>`).join('');
+  const list=S.hist.filter(h=>hFilt==='tous'||(hFilt==='defect'?h.defect:h.type===hFilt)).sort((x,y)=>new Date(y.date)-new Date(x.date));
+  if(!list.length){$('histList').innerHTML=`<div class="card empty">Rien pour l'instant</div>`;return}
+  const r=S.reglages;
+  $('histList').innerHTML=list.map(h=>{
+    const enCours=S[h.type].hid===h.id||(!h.fin&&S[h.type].pose===h.date);
+    const du=hDuree(h), prevu=h.type==='capteur'?r.capJ*24:r.podH;
+    let dl='';
+    if(enCours)dl='<span class="tag" style="background:var(--ok)">EN COURS</span>';
+    else if(h.defect)dl='<span class="tag" style="background:var(--bad)">DÉFECTUEUX</span>';
+    const port=du!=null?`Porté ${fmtRest(du)}${du<prevu-1?` · <span style="color:${h.defect?'var(--bad)':'var(--warn)'}">${fmtRest(prevu-du)} avant la fin</span>`:''}`:'';
+    return `<div class="hcard ${h.defect?'h-bad':'h-ok'}" onclick="openHist('${h.id}')"><div class="ic">${h.type==='capteur'?'📡':'💧'}</div>
+    <div style="flex:1;min-width:0"><b>${NOM[h.type]}</b>${dl}
+    <div class="ln">${fmtDT(h.date)}${h.fin?' → '+fmtDT(h.fin):''}${h.site?' · '+esc(h.site):''}</div>
+    ${h.ref||h.lot?`<div class="ln">${h.ref?'Réf. '+esc(h.ref):''}${h.ref&&h.lot?' · ':''}${h.lot?'Lot <b style="font-size:12px">'+esc(h.lot)+'</b>':''}</div>`:''}
+    ${port?`<div class="ln">${port}</div>`:''}
+    ${h.defect?`<div class="ln" style="color:var(--bad)"><b style="font-size:12px">${esc(h.motif||'Panne')}</b>${h.dnote?' — '+esc(h.dnote):''}</div>`:''}
+    ${h.note?`<div class="ln">${esc(h.note)}</div>`:''}</div></div>`}).join('');
 }
-function delHist(id){S.hist=S.hist.filter(x=>x.id!==id);save();renderHist()}
+function openHist(id){
+  const h=S.hist.find(x=>x.id===id);if(!h)return;
+  modal(`<h3>${h.type==='capteur'?'📡':'💧'} ${NOM[h.type]}</h3>
+  <label>Posé le</label><input type="datetime-local" id="hD" value="${toLocalInput(h.date)}">
+  <label>Emplacement</label><select id="hS">${siteOpts(h.type,h.site)}</select>
+  <div class="row"><div style="flex:1"><label>Référence</label><input id="hR" value="${esc(h.ref||'')}"></div>
+  <div style="flex:1"><label>N° de lot</label><input id="hL" value="${esc(h.lot||'')}"></div></div>
+  <label>Remarque</label><input id="hN" value="${esc(h.note||'')}">
+  <div class="chk"><input type="checkbox" id="chDef" ${h.defect?'checked':''} onchange="toggleD(this.checked)"><span><b>Défectueux</b> (changé en avance pour panne)</span></div>
+  <div class="dbox" id="dBox" style="display:${h.defect?'block':'none'}">
+    <label>Motif</label><select id="hM">${motifOpts(h.type,h.motif)}</select>
+    <label>Détails</label><input id="hDN" value="${esc(h.dnote||'')}">
+  </div>
+  <button class="btn full" onclick="saveHist('${id}')">Enregistrer</button>
+  <button class="btn bad full" onclick="delHist('${id}')">Supprimer</button>
+  <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
+}
+function saveHist(id){
+  const h=S.hist.find(x=>x.id===id);const v=$('hD').value;
+  if(v){const iso=new Date(v).toISOString();if(S[h.type].hid===id)S[h.type].pose=iso;h.date=iso}
+  h.site=$('hS').value;if(S[h.type].hid===id)S[h.type].site=h.site;
+  h.ref=$('hR').value.trim();h.lot=$('hL').value.trim();h.note=$('hN').value.trim();
+  h.defect=$('chDef').checked;if(h.defect){h.motif=$('hM').value;h.dnote=$('hDN').value.trim()}else{delete h.motif;delete h.dnote}
+  save();closeModal();renderAll();toast('Modifié ✅');
+}
+function delHist(id){const h=S.hist.find(x=>x.id===id);S.hist=S.hist.filter(x=>x.id!==id);
+  if(h&&S[h.type].hid===id)S[h.type]={pose:null};save();closeModal();renderAll()}
 
 /* ---------- Réglages ---------- */
 function hx(h){h=String(h).replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
