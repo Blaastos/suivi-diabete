@@ -160,6 +160,12 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 @keyframes hanko{0%{opacity:0;transform:translateX(-50%) scale(2.2) rotate(-12deg)}100%{opacity:.95;transform:translateX(-50%) scale(1) rotate(-4deg)}}
 #splash .skip{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));right:16px;color:rgba(255,255,255,.45);font-size:12px;font-family:-apple-system,sans-serif}
 @media (prefers-reduced-motion:reduce){#splash *{animation-duration:.01s!important;animation-delay:0s!important}}
+.rdv{display:flex;gap:12px;align-items:center}
+.rdv .cal{width:58px;flex:none;border-radius:14px;overflow:hidden;text-align:center;border:1px solid var(--bd);background:var(--card)}
+.rdv .cal .m{background:var(--p);color:var(--pt,#fff);font-size:11px;font-weight:700;padding:3px 0;text-transform:uppercase}
+.rdv .cal .d{font-size:24px;font-weight:800;padding:3px 0 0}.rdv .cal .w{font-size:10.5px;color:var(--mut);padding-bottom:4px}
+.rdv .inf{flex:1;min-width:0}.rdv .inf b{font-size:15px;display:block}.rdv .inf span{display:block;font-size:12.5px;color:var(--mut);margin-top:2px}
+.rdv .inf span.cd,.cd{display:inline-block;width:auto;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;margin-top:6px;color:#fff;background:var(--p)}
 .ord-end{font-size:13px;font-weight:700}
 </style>
 </head>
@@ -196,6 +202,7 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
   </div>
   <div id="kContacts"></div>
   <div id="cBanner"></div>
+  <div id="cRdv"></div>
 
   <div class="sec-t">En cours</div>
   <div class="card" id="cCapteur"></div>
@@ -220,6 +227,14 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 </section>
 
 <!-- ORDONNANCES -->
+<section class="view" id="v-rdv">
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div><b style="font-size:17px">Rendez-vous</b><div style="font-size:12px;color:var(--mut)">Hôpital, pédiatre, infirmière, bilans…</div></div>
+    <button class="btn sm" onclick="openRdv()">+ Ajouter</button>
+  </div>
+  <div id="rdvList"></div>
+</section>
+
 <section class="view" id="v-ordo">
   <div class="card" style="display:flex;justify-content:space-between;align-items:center">
     <div><b style="font-size:17px">Ordonnances</b><div style="font-size:12px;color:var(--mut)">Fin de validité et prochain passage pharmacie</div></div>
@@ -294,7 +309,8 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 <nav>
   <button class="on" data-v="accueil"><span class="ic">🏠</span>Accueil</button>
   <button data-v="stock"><span class="ic">📦</span>Stock</button>
-  <button data-v="ordo"><span class="ic">📄</span>Ordonnances</button>
+  <button data-v="rdv"><span class="ic">📅</span>RDV</button>
+  <button data-v="ordo"><span class="ic">📄</span>Ordos</button>
   <button data-v="hist"><span class="ic">🕓</span>Historique</button>
   <button data-v="reg"><span class="ic">⚙️</span>Réglages</button>
 </nav>
@@ -321,7 +337,7 @@ function defaults(){return{
     {id:uid(),cat:'Resucrage & glucagon',nom:'Sucres / resucrage',qte:0,unite:'',seuil:10,per:''},
     {id:uid(),cat:'Resucrage & glucagon',nom:'Glucagon (Baqsimi / GlucaGen)',qte:0,unite:'',seuil:1,per:''}
   ],
-  ordos:[], hist:[], look:{}, closed:{}, commandes:[], notified:{}
+  ordos:[], hist:[], look:{}, closed:{}, commandes:[], notified:{}, rdvs:[]
 }}
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))||defaults()}catch(e){S=defaults()}
@@ -449,11 +465,11 @@ function renderKid(){
 function telHref(t){return 'tel:'+String(t).replace(/[^\d+]/g,'')}
 function renderContacts(){
   const k=S.enfant,c=[];
-  if(k.infNom||k.infTel)c.push(['👩‍⚕️','Infirmière',k.infNom,'',k.infTel]);
-  if(k.pedNom||k.pedTel)c.push(['🩺','Pédiatre',k.pedNom,k.pedHop,k.pedTel]);
-  $('kContacts').innerHTML=c.length?`<div class="card" style="padding:4px 16px">${c.map(([ic,role,nom,hop,tel])=>`<div class="contact"><div class="ic">${ic}</div>
-    <div class="who"><b>${esc(nom||role)}</b><span>${role}${hop?' · '+esc(hop):''}${tel?'<br>'+esc(tel):''}</span></div>
-    ${tel?`<a class="call" href="${telHref(tel)}">📞 Appeler</a>`:''}</div>`).join('')}</div>`:'';
+  if(k.infNom||k.infTel||k.infEmail)c.push(['👩‍⚕️','Infirmière',k.infNom,'',k.infTel,k.infEmail]);
+  if(k.pedNom||k.pedTel||k.pedEmail)c.push(['🩺','Pédiatre',k.pedNom,k.pedHop,k.pedTel,k.pedEmail]);
+  $('kContacts').innerHTML=c.length?`<div class="card" style="padding:4px 16px">${c.map(([ic,role,nom,hop,tel,mail])=>`<div class="contact"><div class="ic">${ic}</div>
+    <div class="who"><b>${esc(nom||role)}</b><span>${role}${hop?' · '+esc(hop):''}${tel?'<br>'+esc(tel):''}${mail?'<br>'+esc(mail):''}</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px">${tel?`<a class="call" href="${telHref(tel)}">📞 Appeler</a>`:''}${mail?`<a class="call" style="background:var(--p);color:var(--pt,#fff)" href="mailto:${esc(mail)}">✉️ E-mail</a>`:''}</div></div>`).join('')}</div>`:'';
 }
 let tmpPhoto=null;
 function openKid(){
@@ -470,6 +486,7 @@ function openKid(){
   <label>🩺 Pédiatre — nom</label><input id="kPedN" value="${esc(k.pedNom||'')}" placeholder="Dr …">
   <label>🩺 Pédiatre — hôpital / service</label><input id="kPedH" value="${esc(k.pedHop||'')}">
   <label>🩺 Pédiatre — numéro</label><input type="tel" id="kPedT" value="${esc(k.pedTel||'')}" placeholder="04 …">
+  <label>🩺 Pédiatre — e-mail</label><input type="email" id="kPedE" value="${esc(k.pedEmail||'')}">
   <label>Votre prénom (signature des messages)</label><input id="kSig" value="${esc(k.sig||'')}">
   <label>Autres infos utiles</label><textarea id="kNo" rows="3">${esc(k.notes)}</textarea>
   <label>Photo</label><input type="file" accept="image/*" onchange="loadPhoto(this)">
@@ -482,7 +499,7 @@ function loadPhoto(inp){
     const m=Math.min(img.width,img.height),x=c.getContext('2d');x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s);tmpPhoto=c.toDataURL('image/jpeg',.8);toast('Photo prête')};img.src=e.target.result};
   r.readAsDataURL(f);
 }
-function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||'',infNom:$('kInfN').value.trim(),infTel:$('kInfT').value.trim(),pedNom:$('kPedN').value.trim(),pedTel:$('kPedT').value.trim(),pedHop:$('kPedH').value.trim(),code:$('kCode').value.trim(),jp:$('kJp').value.trim(),infEmail:$('kInfE').value.trim(),sig:$('kSig').value.trim()};save();closeModal();renderAll()}
+function saveKid(){S.enfant={prenom:$('kP').value.trim(),naissance:$('kN').value,insuline:$('kI').value.trim(),notes:$('kNo').value.trim(),photo:tmpPhoto||'',infNom:$('kInfN').value.trim(),infTel:$('kInfT').value.trim(),pedNom:$('kPedN').value.trim(),pedTel:$('kPedT').value.trim(),pedHop:$('kPedH').value.trim(),code:$('kCode').value.trim(),jp:$('kJp').value.trim(),infEmail:$('kInfE').value.trim(),pedEmail:$('kPedE').value.trim(),sig:$('kSig').value.trim()};save();closeModal();renderAll()}
 
 /* ---------- Alertes ---------- */
 function alerts(){
@@ -498,6 +515,7 @@ function alerts(){
     if(i.qte<=i.seuil&&autonomie(i)==null)a.push([i.qte===0?'r':'o',`<b>${esc(i.nom)}</b> : ${i.qte===0?'plus de stock':'stock bas ('+i.qte+')'}`]);
     if(i.per){const d=daysTo(i.per);if(d<0)a.push(['r',`<b>${esc(i.nom)}</b> périmé depuis le ${fmtD(i.per)}`]);else if(d<=lim)a.push(['o',`<b>${esc(i.nom)}</b> périme dans ${d} j (${fmtD(i.per)})`])}
   });
+  upcomingRdv().forEach(r=>{const d=daysTo(r.date);if(d<=(+r.rappel||0))a.push([d<=1?'r':'o',`<b>📅 ${esc(r.titre)}</b> ${whenTxt(r.date)} à ${hm(r.date)}${r.lieu?' — '+esc(r.lieu):''}`])});
   S.ordos.forEach(o=>{
     const fin=ordoFin(o),d=daysTo(fin);
     if(d<0)a.push(['r',`<b>Ordonnance ${esc(o.titre)}</b> expirée — à renouveler`]);
@@ -847,6 +865,9 @@ function checkNotifs(){
     if(s.st==='exp')once(t+s.start+'exp',n+' expiré','À changer maintenant.');
     else if(s.st==='grace')once(t+s.start+'gr',n+' en période de grâce','Plus que '+fmtRest(s.graceRest)+'.');
     else if(s.restH<=12)once(t+s.start+'12',n+' à changer bientôt','Dans '+fmtRest(s.restH)+'.');});
+  upcomingRdv().forEach(r=>{const d=daysTo(r.date);
+    if(d<=(+r.rappel||0)&&d>=1)once('rdv'+r.id+'r','📅 Rendez-vous '+whenTxt(r.date),r.titre+' à '+hm(r.date)+(r.lieu?' — '+r.lieu:''));
+    if(d===0)once('rdv'+r.id+'j','📅 Rendez-vous aujourd\'hui',r.titre+' à '+hm(r.date)+(r.lieu?' — '+r.lieu:''));});
   const nd=S.hist.filter(h=>h.defect&&!h.declared).length;
   if(nd)daily('decl','Panne à déclarer',nd+' panne(s) pas encore déclarée(s) à l\'infirmière.');
   if(ch)save();
@@ -885,6 +906,57 @@ function runSplash(force){
 }
 function endSplash(){const sp=$('splash');if(sp.style.display==='none'||sp.classList.contains('out'))return;clearTimeout(spTimer);sp.classList.add('out');setTimeout(()=>{sp.style.display='none';cancelAnimationFrame(spRaf)},560)}
 
+/* ---------- Rendez-vous ---------- */
+const RDV_TYPES=['Consultation diabéto (hôpital)','Pédiatre','Infirmière','Prise de sang / HbA1c','Éducation thérapeutique','Ophtalmo','Dentiste','Autre'];
+function hm(d){return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
+function whenTxt(d){const n=daysTo(d);return n===0?"aujourd'hui":n===1?'demain':n===2?'après-demain':'dans '+n+' jours'}
+function upcomingRdv(){const lim=Date.now()-2*36e5;return S.rdvs.filter(r=>new Date(r.date).getTime()>=lim).sort((a,b)=>new Date(a.date)-new Date(b.date))}
+function calBox(d){const x=new Date(d);return `<div class="cal"><div class="m">${x.toLocaleDateString('fr-FR',{month:'short'})}</div><div class="d">${x.getDate()}</div><div class="w">${x.toLocaleDateString('fr-FR',{weekday:'short'})}</div></div>`}
+function rdvRow(r,past){const d=daysTo(r.date),soon=!past&&d<=(+r.rappel||0);
+  return `<div class="rdv">${calBox(r.date)}<div class="inf"><b>${esc(r.titre)}</b>
+  <span>🕐 ${hm(r.date)}${r.lieu?' · 📍 '+esc(r.lieu):''}</span>${r.avec?`<span>👤 ${esc(r.avec)}</span>`:''}${r.notes?`<span>📝 ${esc(r.notes)}</span>`:''}
+  ${past?'':`<span class="cd" style="${soon?'background:var(--warn)':''}">${whenTxt(r.date)}</span>`}</div></div>`}
+function renderRdv(){
+  const up=upcomingRdv(),next=up[0];
+  $('cRdv').innerHTML=next?`<div class="sec-t">Prochain rendez-vous</div><div class="card ${daysTo(next.date)<=(+next.rappel||0)?'aura-ok':''}" onclick="openRdv('${next.id}')" style="cursor:pointer">${rdvRow(next)}
+    ${up.length>1?`<div style="font-size:12px;color:var(--mut);margin-top:10px">+ ${up.length-1} autre${up.length>2?'s':''} rendez-vous à venir</div>`:''}</div>`:'';
+  const past=S.rdvs.filter(r=>!up.includes(r)).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  $('rdvList').innerHTML=(up.length?`<div class="sec-t">À venir</div>`+up.map(r=>`<div class="card" onclick="openRdv('${r.id}')" style="cursor:pointer">${rdvRow(r)}</div>`).join(''):`<div class="card empty">Aucun rendez-vous à venir</div>`)
+   +(past.length?`<div class="sec-t">Passés</div>`+past.slice(0,20).map(r=>`<div class="card" onclick="openRdv('${r.id}')" style="cursor:pointer;opacity:.65">${rdvRow(r,true)}</div>`).join(''):'');
+}
+function openRdv(id){
+  const r=id?S.rdvs.find(x=>x.id===id):{titre:'',date:'',lieu:S.enfant.pedHop||'',avec:'',notes:'',rappel:2};
+  const isType=RDV_TYPES.includes(r.titre);
+  modal(`<h3>${id?'Modifier le':'Nouveau'} rendez-vous</h3>
+  <label>Type</label><select id="rT" onchange="$('rTx').style.display=this.value==='Autre'?'':'none'">${RDV_TYPES.map(t=>`<option ${(isType?t===r.titre:t==='Autre'&&r.titre)?'selected':''}>${t}</option>`).join('')}</select>
+  <input id="rTx" style="margin-top:8px;display:${!isType&&r.titre?'':'none'}" placeholder="Précise le rendez-vous" value="${isType?'':esc(r.titre)}">
+  <label>Date et heure</label><input type="datetime-local" id="rD" value="${r.date?toLocalInput(r.date):''}">
+  <label>Lieu</label><input id="rL" value="${esc(r.lieu)}" placeholder="Hôpital, service, adresse…">
+  <label>Avec</label><input id="rA" value="${esc(r.avec)}" placeholder="Dr …">
+  <label>Rappel sur l'accueil (jours avant)</label><select id="rR">${[0,1,2,3,7,14].map(n=>`<option value="${n}" ${+r.rappel===n?'selected':''}>${n===0?'Le jour même':n===1?'La veille':n+' jours avant'}</option>`).join('')}</select>
+  <label>Notes (à apporter, questions…)</label><textarea id="rN" rows="3">${esc(r.notes)}</textarea>
+  <button class="btn full" onclick="saveRdv('${id||''}')">Enregistrer</button>
+  ${id?`<button class="btn sec full" onclick="icsRdv('${id}')">📆 Ajouter à l'agenda du téléphone</button><button class="btn bad full" onclick="delRdv('${id}')">Supprimer</button>`:''}
+  <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
+}
+function saveRdv(id){
+  const t=$('rT').value==='Autre'?($('rTx').value.trim()||'Rendez-vous'):$('rT').value,v=$('rD').value;
+  if(!v){toast('Date manquante');return}
+  const d={titre:t,date:new Date(v).toISOString(),lieu:$('rL').value.trim(),avec:$('rA').value.trim(),rappel:+$('rR').value,notes:$('rN').value.trim()};
+  if(id){const r=S.rdvs.find(x=>x.id===id);if(r.date!==d.date)Object.keys(S.notified||{}).forEach(k=>{if(k.startsWith('rdv'+id))delete S.notified[k]});Object.assign(r,d)}
+  else S.rdvs.push({id:uid(),...d});
+  save();closeModal();renderAll();toast('Rendez-vous enregistré ✅');
+}
+function delRdv(id){S.rdvs=S.rdvs.filter(x=>x.id!==id);save();closeModal();renderAll()}
+function icsRdv(id){
+  const r=S.rdvs.find(x=>x.id===id),f=d=>new Date(d).toISOString().replace(/[-:]/g,'').slice(0,15)+'Z',e=x=>String(x||'').replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n');
+  const end=new Date(new Date(r.date).getTime()+36e5);
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Suivi Diabete//FR','BEGIN:VEVENT','UID:'+r.id+'@suivi-diabete','DTSTAMP:'+f(new Date()),'DTSTART:'+f(r.date),'DTEND:'+f(end),
+    'SUMMARY:'+e(r.titre+(S.enfant.prenom?' — '+S.enfant.prenom:'')),'LOCATION:'+e(r.lieu),'DESCRIPTION:'+e([r.avec,r.notes].filter(Boolean).join('\n')),
+    'BEGIN:VALARM','TRIGGER:-P1D','ACTION:DISPLAY','DESCRIPTION:Rappel','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'}));a.download='rdv.ics';document.body.appendChild(a);a.click();a.remove();toast('Ouvre le fichier pour l\'ajouter')}catch(err){toast('Impossible ici')}
+}
+
 /* ---------- UI ---------- */
 function modal(h){$('modalBox').innerHTML=h;$('modal').classList.add('on')}
 function closeModal(){$('modal').classList.remove('on')}
@@ -895,7 +967,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 });
 function renderAll(){
   $('today').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  renderKid();renderBanner();renderCmd();renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderStock();renderOrdo();renderHist();renderReg();
+  renderKid();renderBanner();renderRdv();renderCmd();renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderStock();renderOrdo();renderHist();renderReg();
 }
 applyLook();
 renderAll();
