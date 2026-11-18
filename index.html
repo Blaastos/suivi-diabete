@@ -1048,11 +1048,43 @@ async function syncNow(){
   if(!navigator.onLine){setSync('off');return}
   syncing=true;setSync('busy');
   try{
-    const r=await api({a:'v'});
+    const r=await api({a:'v'});SC.sv=r.sv||1;
     if(r.v!==SC.v||SC.fresh)await applyRemote(await api({a:'get'}));
     if(SC.dirty)await pushNow();
     SC.last=Date.now();saveSC();setSync('ok');
+    if(SC.sv>=2&&SC.bk!==dayStr())backupNow(true);
   }catch(e){setSync('err',e)}finally{syncing=false}
+}
+function dayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+let backing=false;
+async function backupNow(auto){
+  if(!SC||!SC.url||backing)return;backing=true;
+  try{const r=await api({a:'backup',day:dayStr(),who:SC.name||'',data:await encryptData(shared(S))});
+    SC.bk=dayStr();SC.bkAt=new Date().toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});saveSC();renderSync();if(!auto)toast('Sauvegarde faite sur le Drive ✅')}
+  catch(e){if(!auto)toast('Sauvegarde impossible : '+(e.message||e))}finally{backing=false}
+}
+async function openRestore(){
+  modal(`<h3>♻️ Restaurer une sauvegarde</h3><div id="rsList" class="empty">Chargement…</div><button class="btn sec full" onclick="closeModal()">Fermer</button>`);
+  try{const r=await api({a:'list'});
+    $('rsList').className='';$('rsList').innerHTML=r.list.length?`<div style="font-size:12.5px;color:var(--mut);margin-bottom:6px">Une sauvegarde par jour, les 60 derniers jours.</div>`+r.list.map(f=>`<div class="oi"><div class="nm">${esc(f.name.replace('Sauvegarde ','').replace('.json',''))}<span>mise à jour ${fmtDT(f.at)}</span></div><button class="btn sm" onclick="askRestore('${esc(f.id)}','${esc(f.name)}')">Restaurer</button></div>`).join(''):'<div class="empty">Aucune sauvegarde pour l\'instant</div>'}
+  catch(e){$('rsList').textContent='Erreur : '+(e.message||e)}
+}
+function askRestore(id,name){modal(`<h3>Restaurer ${esc(name.replace('.json',''))} ?</h3><div style="font-size:14px;color:var(--mut)">Les données actuelles (stock, historique, rendez-vous…) sont remplacées par celles de cette sauvegarde, <b>sur tous les téléphones de la famille</b>. Les données d'aujourd'hui sont sauvegardées avant, au cas où.</div>
+  <button class="btn bad full" onclick="doRestore('${id}')">Oui, restaurer</button><button class="btn sec full" onclick="closeModal()">Annuler</button>`)}
+async function doRestore(id){
+  try{toast('Restauration…');await backupNow(true);
+    const r=await api({a:'restore',id});const R=await decryptData(r.data);
+    SH_ARR.concat(SH_OBJ).forEach(k=>{if(R[k]!==undefined)S[k]=clone(R[k])});
+    evt('données restaurées depuis une sauvegarde');save();closeModal();renderAll();await syncNow();toast('Sauvegarde restaurée ✅')}
+  catch(e){toast('Restauration impossible : '+(e.message||e))}
+}
+async function openUpdScript(){
+  const tok=await tokenOf(SC.code);window._sc=scriptCode(tok);
+  modal(`<h3>⬆️ Mettre à jour le script</h3>
+  <div class="step"><div class="n">1</div><div>Copie le nouveau script :<button class="btn sec full" onclick="copyTxt(window._sc)">📋 Copier le script</button></div></div>
+  <div class="step"><div class="n">2</div><div>Sur <b>script.google.com</b>, ouvre ton projet, efface tout et colle-le. <b>Remets tes adresses mail</b> à la ligne EMAILS, puis enregistre 💾.</div></div>
+  <div class="step"><div class="n">3</div><div><b>Déployer → Gérer les déploiements → ✏️</b> → Version : <b>Nouvelle version</b> → <b>Déployer</b>. Si Google redemande une autorisation (pour le dossier Drive), accepte. L'URL ne change pas.</div></div>
+  <button class="btn full" onclick="closeModal();syncNow()">C'est fait</button><button class="btn sec full" onclick="closeModal()">Plus tard</button>`);
 }
 function ago(t){if(!t)return'jamais';const m=Math.round((Date.now()-t)/6e4);return m<1?"à l'instant":m<60?'il y a '+m+' min':'il y a '+Math.round(m/60)+' h'}
 function renderSync(){
@@ -1065,6 +1097,9 @@ function renderSync(){
   b.innerHTML=`<div style="font-size:13.5px"><span class="sdot" style="background:${col}"></span>${lab}</div>
   <div style="font-size:12.5px;color:var(--mut);margin-top:4px">Ce téléphone : <b>${esc(SC.name||'—')}</b></div>
   <button class="btn full" onclick="syncNow()">🔄 Synchroniser maintenant</button>
+  <div style="font-size:12.5px;color:var(--mut);margin-top:10px">💾 Sauvegarde Drive (dossier « Suivi Diabète ») : ${SC.sv>=2?(SC.bk?'dernière le '+esc(SC.bkAt||SC.bk):'pas encore faite'):'<b style="color:var(--warn)">script à mettre à jour</b>'}</div>
+  ${SC.sv>=2?`<div class="row" style="margin-top:8px"><button class="btn sec" style="flex:1" onclick="backupNow()">💾 Sauvegarder</button><button class="btn sec" style="flex:1" onclick="openRestore()">♻️ Restaurer</button></div>`
+   :`<button class="btn full" style="background:var(--warn)" onclick="openUpdScript()">⬆️ Mettre à jour le script (sauvegardes)</button>`}
   <button class="btn sec full" onclick="openInvite()">📨 Ajouter un téléphone</button>
   <button class="btn sec full" onclick="openSyncName()">✏️ Changer le nom de ce téléphone</button>
   <button class="btn sec full" style="color:var(--bad)" onclick="openLeave()">Déconnecter ce téléphone</button>`;
@@ -1079,7 +1114,28 @@ function doPost(e){
   var p = {}; try { p = JSON.parse(e.postData.contents); } catch (err) {}
   if (!p.t || p.t !== TOKEN) return out({ok:false, err:'acces refuse'});
   var props = PropertiesService.getScriptProperties();
-  if (p.a === 'v') return out({ok:true, v:Number(props.getProperty('V') || 0)});
+  if (p.a === 'v') return out({ok:true, sv:2, v:Number(props.getProperty('V') || 0)});
+  if (p.a === 'backup') {
+    var fo = folder_(), name = 'Sauvegarde ' + p.day + '.json', it = fo.getFilesByName(name);
+    var content = JSON.stringify({app:'suivi-diabete', chiffre:true, date:new Date().toISOString(), par:p.who || '', data:p.data});
+    if (it.hasNext()) it.next().setContent(content); else fo.createFile(name, content, 'application/json');
+    var all = [], fs = fo.getFiles();
+    while (fs.hasNext()) { var x = fs.next(); if (/^Sauvegarde /.test(x.getName())) all.push(x); }
+    all.sort(function(a, b){ return b.getName() < a.getName() ? -1 : 1; });
+    for (var i = 60; i < all.length; i++) all[i].setTrashed(true);
+    return out({ok:true, name:name});
+  }
+  if (p.a === 'list') {
+    var l = [], fs2 = folder_().getFiles();
+    while (fs2.hasNext()) { var y = fs2.next(); if (/^Sauvegarde /.test(y.getName())) l.push({id:y.getId(), name:y.getName(), at:y.getLastUpdated().toISOString()}); }
+    l.sort(function(a, b){ return b.name < a.name ? -1 : 1; });
+    return out({ok:true, list:l.slice(0, 60)});
+  }
+  if (p.a === 'restore') {
+    var bf = DriveApp.getFileById(p.id), parents = bf.getParents();
+    if (!parents.hasNext() || parents.next().getId() !== folder_().getId()) return out({ok:false, err:'fichier'});
+    return out({ok:true, data:JSON.parse(bf.getBlob().getDataAsString()).data});
+  }
   var f = file_(props);
   if (p.a === 'get') return out(Object.assign({ok:true}, JSON.parse(f.getBlob().getDataAsString())));
   if (p.a === 'put') {
@@ -1099,11 +1155,20 @@ function doPost(e){
   }
   return out({ok:false, err:'action'});
 }
+function folder_(){
+  var props = PropertiesService.getScriptProperties(), id = props.getProperty('FOLDER');
+  if (id) { try { var f0 = DriveApp.getFolderById(id); if (!f0.isTrashed()) return f0; } catch (e) {} }
+  var it = DriveApp.getFoldersByName('Suivi Diabète');
+  var fo = it.hasNext() ? it.next() : DriveApp.createFolder('Suivi Diabète');
+  props.setProperty('FOLDER', fo.getId()); return fo;
+}
 function file_(props){
-  var id = props.getProperty('FILE');
-  if (id) { try { return DriveApp.getFileById(id); } catch (e) {} }
-  var f = DriveApp.createFile('suivi-diabete-sync.json', JSON.stringify({v:0, data:null}), 'application/json');
-  props.setProperty('FILE', f.getId()); props.setProperty('V', '0'); return f;
+  var id = props.getProperty('FILE'), f = null;
+  if (id) { try { f = DriveApp.getFileById(id); } catch (e) {} }
+  if (!f) { f = DriveApp.createFile('suivi-diabete-sync.json', JSON.stringify({v:0, data:null}), 'application/json'); props.setProperty('FILE', f.getId()); props.setProperty('V', '0'); }
+  var fo = folder_(), ps = f.getParents();
+  if (!ps.hasNext() || ps.next().getId() !== fo.getId()) { try { f.moveTo(fo); } catch (e) {} }
+  return f;
 }
 function out(o){ return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 `}
