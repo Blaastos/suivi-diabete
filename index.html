@@ -424,9 +424,13 @@ function renderDev(type){
   ${h.ref||h.lot?`<div class="l">${h.ref?'Réf. '+esc(h.ref):''}${h.ref&&h.lot?' · ':''}${h.lot?'Lot '+esc(h.lot):''}</div>`:''}
   <span class="badge" style="background:${s.col}">${s.lab}</span></div></div>
   <button class="btn full" onclick="openChange('${type}')">🔄 ${type==='capteur'?'Nouveau capteur posé':'Nouveau pod posé'}</button>
-  <button class="btn sec full" style="margin-top:8px;color:var(--bad)" onclick="openChange('${type}',true)">⚠️ En panne — changer maintenant</button>`;
+  <div class="row" style="margin-top:8px"><button class="btn sec" style="flex:1" onclick="editCur('${type}')">✏️ Modifier</button>
+  <button class="btn sec" style="flex:1.4;color:var(--bad)" onclick="openChange('${type}',true)">⚠️ En panne</button></div>`;
 }
-function siteOpts(type,sel){const l=type==='capteur'?['Bras gauche','Bras droit','Ventre gauche','Ventre droit','Fesse gauche','Fesse droite']:['Bras gauche','Bras droit','Ventre gauche','Ventre droit','Cuisse gauche','Cuisse droite','Fesse gauche','Fesse droite','Dos'];
+function editCur(type){let h=curHist(type);
+  if(!h){h={id:uid(),type,date:S[type].pose,site:S[type].site||''};S.hist.unshift(h);S[type].hid=h.id;save()}
+  openHist(h.id)}
+function siteOpts(type,sel){const l=['Ventre gauche','Ventre droit','Bras gauche','Bras droit','Cuisse gauche','Cuisse droite'];
   if(sel&&!l.includes(sel))l.push(sel);return `<option value="">—</option>`+l.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('')}
 function motifOpts(type,sel){return MOTIFS[type].map(m=>`<option ${m===sel?'selected':''}>${m}</option>`).join('')}
 function toggleD(on){$('dBox').style.display=on?'block':'none'}
@@ -656,13 +660,14 @@ function renderHist(){
 }
 function openHist(id){
   const h=S.hist.find(x=>x.id===id);if(!h)return;
-  modal(`<h3>${h.type==='capteur'?'📡':'💧'} ${NOM[h.type]}</h3>
+  const enCours=S[h.type].hid===h.id;
+  modal(`<h3>${h.type==='capteur'?'📡':'💧'} ${enCours?'Modifier le '+(h.type==='capteur'?'capteur':'pod')+' en cours':NOM[h.type]}</h3>
   <label>Posé le</label><input type="datetime-local" id="hD" value="${toLocalInput(h.date)}">
   <label>Emplacement</label><select id="hS">${siteOpts(h.type,h.site)}</select>
   <div class="row"><div style="flex:1"><label>Référence</label><input id="hR" value="${esc(h.ref||'')}"></div>
   <div style="flex:1"><label>N° de lot</label><input id="hL" value="${esc(h.lot||'')}"></div></div>
   <label>Remarque</label><input id="hN" value="${esc(h.note||'')}">
-  <div class="chk"><input type="checkbox" id="chDef" ${h.defect?'checked':''} onchange="toggleD(this.checked)"><span><b>Défectueux</b> (changé en avance pour panne)</span></div>
+  <div ${enCours?'style="display:none"':''}><div class="chk"><input type="checkbox" id="chDef" ${h.defect?'checked':''} onchange="toggleD(this.checked)"><span><b>Défectueux</b> (changé en avance pour panne)</span></div></div>
   <div class="dbox" id="dBox" style="display:${h.defect?'block':'none'}">
     <label>Motif</label><select id="hM">${motifOpts(h.type,h.motif)}</select>
     <label>Détails</label><input id="hDN" value="${esc(h.dnote||'')}">
@@ -670,7 +675,7 @@ function openHist(id){
     <button class="btn sec full" onclick="saveHist('${id}',true)">📨 Préparer le message pour l'infirmière</button>
   </div>
   <button class="btn full" onclick="saveHist('${id}')">Enregistrer</button>
-  <button class="btn bad full" onclick="delHist('${id}')">Supprimer</button>
+  ${enCours?'':`<button class="btn bad full" onclick="delHist('${id}')">Supprimer</button>`}
   <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
 }
 function saveHist(id,thenDeclare){
