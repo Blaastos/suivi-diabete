@@ -166,6 +166,10 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
 .rdv .cal .d{font-size:24px;font-weight:800;padding:3px 0 0}.rdv .cal .w{font-size:10.5px;color:var(--mut);padding-bottom:4px}
 .rdv .inf{flex:1;min-width:0}.rdv .inf b{font-size:15px;display:block}.rdv .inf span{display:block;font-size:12.5px;color:var(--mut);margin-top:2px}
 .rdv .inf span.cd,.cd{display:inline-block;width:auto;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;margin-top:6px;color:#fff;background:var(--p)}
+.sdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.step{display:flex;gap:10px;margin-top:12px;font-size:13.5px}.step .n{width:24px;height:24px;border-radius:50%;background:var(--p);color:var(--pt,#fff);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;flex:none}
+.codebox{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;word-break:break-all;margin-top:6px}
+.fa{font-size:13px;padding:7px 0;border-bottom:1px solid var(--bd)}.fa:last-child{border-bottom:none}.fa span{color:var(--mut);font-size:11.5px}
 .ord-end{font-size:13px;font-weight:700}
 </style>
 </head>
@@ -250,12 +254,18 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
     <div style="font-size:12px;color:var(--mut)">Touchez une ligne pour la modifier ou la marquer défectueuse</div>
     <div class="stat" id="histStat" style="margin-top:12px"></div>
   </div>
+  <div id="famAct"></div>
   <div class="filt" id="histFilt"></div>
   <div id="histList"></div>
 </section>
 
 <!-- REGLAGES -->
 <section class="view" id="v-reg">
+  <div class="card">
+    <b style="font-size:17px">🔄 Synchro famille</b>
+    <div style="font-size:12.5px;color:var(--mut);margin-top:4px">Les mêmes infos sur les téléphones de toute la famille. Données chiffrées sur le téléphone avant l'envoi.</div>
+    <div id="syncBox" style="margin-top:10px"></div>
+  </div>
   <div class="card">
     <b style="font-size:17px">🎨 Thème de couleurs</b>
     <div class="themes" style="margin-top:12px" id="themes"></div>
@@ -337,12 +347,13 @@ function defaults(){return{
     {id:uid(),cat:'Resucrage & glucagon',nom:'Sucres / resucrage',qte:0,unite:'',seuil:10,per:''},
     {id:uid(),cat:'Resucrage & glucagon',nom:'Glucagon (Baqsimi / GlucaGen)',qte:0,unite:'',seuil:1,per:''}
   ],
-  ordos:[], hist:[], look:{}, closed:{}, commandes:[], notified:{}, rdvs:[]
+  ordos:[], hist:[], look:{}, closed:{}, commandes:[], notified:{}, rdvs:[], journal:[], del:{}, meta:{}
 }}
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))||defaults()}catch(e){S=defaults()}
 S=Object.assign(defaults(),S);S.reglages=Object.assign(defaults().reglages,S.reglages);
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){const ch=stamp();persist();if(ch&&SC&&SC.code){SC.dirty=true;saveSC();schedSync()}}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1800)}
@@ -448,6 +459,8 @@ function doChange(type){
   S.hist.unshift(nh);
   S[type]={pose:iso,site,hid:nh.id};
   if($('chStock')&&$('chStock').checked){const it=S.stock.find(x=>x.lien===type);if(it)it.qte=Math.max(0,it.qte-1)}
+  if(cur&&cur.defect)evt((type==='capteur'?'Panne de capteur':'Panne de pod')+' signalée');
+  evt(type==='capteur'?'nouveau capteur posé'+(site?' ('+site.toLowerCase()+')':''):'nouveau pod posé'+(site?' ('+site.toLowerCase()+')':''));
   save();closeModal();renderAll();toast(type==='capteur'?'Capteur enregistré ✅':'Pod enregistré ✅');
   if(cur&&cur.defect&&!cur.declared)setTimeout(()=>openDeclare(cur.id),350);
 }
@@ -738,8 +751,8 @@ function importData(inp){
   r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.stock)throw 0;S=Object.assign(defaults(),d);save();applyLook();renderAll();toast('Données importées ✅')}catch(err){toast('Fichier invalide')}inp.value=''};
   r.readAsText(f);
 }
-function openReset(){modal(`<h3>Tout effacer ?</h3><div style="font-size:14px;color:var(--mut)">Fiche, stock, ordonnances et historique seront supprimés. Pense à exporter avant.</div>
-  <button class="btn bad full" onclick="S=defaults();save();applyLook();closeModal();renderAll();toast('Données effacées')">Oui, tout effacer</button>
+function openReset(){modal(`<h3>Tout effacer ?</h3><div style="font-size:14px;color:var(--mut)">Fiche, stock, ordonnances et historique seront supprimés de ce téléphone. Pense à exporter avant.${SC&&SC.code?'<br><br>Ce téléphone sera aussi déconnecté de la synchro : les autres téléphones gardent leurs données.':''}</div>
+  <button class="btn bad full" onclick="resetAll()">Oui, tout effacer</button>
   <button class="btn sec full" onclick="closeModal()">Annuler</button>`)}
 
 /* ---------- Autonomie / commandes / messages ---------- */
@@ -806,7 +819,7 @@ function buildCmdMsg(){
 function logCommande(via){
   if(sendCtx&&sendCtx.logged)return;const l=cmdLines();if(!l.length)return;
   S.commandes.unshift({id:uid(),date:new Date().toISOString(),via,items:l.map(([i,q])=>({sid:i.id,nom:i.nom,q})),statut:'envoyee'});
-  if(sendCtx)sendCtx.logged=true;save();renderCmd();
+  if(sendCtx)sendCtx.logged=true;evt('commande envoyée à l\'infirmière');save();renderCmd();
 }
 function renderCmd(){
   const l=S.commandes.filter(c=>c.statut==='envoyee');
@@ -822,13 +835,13 @@ function openRecu(id){
 function doRecu(id){
   const c=S.commandes.find(x=>x.id===id);
   document.querySelectorAll('.rq').forEach(e=>{const x=c.items[+e.dataset.n],q=Math.max(0,+e.value||0);const it=S.stock.find(i=>i.id===x.sid)||S.stock.find(i=>i.nom===x.nom);if(it)it.qte+=q;x.recu=q});
-  c.statut='recue';c.recuLe=new Date().toISOString();save();closeModal();renderAll();toast('Stock mis à jour ✅');
+  c.statut='recue';c.recuLe=new Date().toISOString();evt('commande reçue, stock mis à jour');save();closeModal();renderAll();toast('Stock mis à jour ✅');
 }
 function delCmd(id){S.commandes=S.commandes.filter(x=>x.id!==id);save();renderCmd()}
 /* Déclaration de panne */
 function openDeclare(id){
   const h=S.hist.find(x=>x.id===id);if(!h)return;
-  sendCtx={subject:`Déclaration de panne ${NOM[h.type]} — ${S.enfant.prenom||''}`.trim(),done:false,onSent:()=>{h.declared=true;h.declDate=new Date().toISOString();save();renderAll()}};
+  sendCtx={subject:`Déclaration de panne ${NOM[h.type]} — ${S.enfant.prenom||''}`.trim(),done:false,onSent:()=>{if(!h.declared)evt('panne déclarée à l\'infirmière');h.declared=true;h.declDate=new Date().toISOString();save();renderAll()}};
   modal(`<h3>📨 Déclarer la panne à l'infirmière</h3>${msgUI()}
   <button class="btn sec full" onclick="sendCtx.onSent();closeModal();toast('Marquée comme déclarée ✅')">✅ Marquer comme déclarée</button>
   <button class="btn sec full" onclick="closeModal()">Plus tard</button>`);
@@ -944,7 +957,7 @@ function saveRdv(id){
   if(!v){toast('Date manquante');return}
   const d={titre:t,date:new Date(v).toISOString(),lieu:$('rL').value.trim(),avec:$('rA').value.trim(),rappel:+$('rR').value,notes:$('rN').value.trim()};
   if(id){const r=S.rdvs.find(x=>x.id===id);if(r.date!==d.date)Object.keys(S.notified||{}).forEach(k=>{if(k.startsWith('rdv'+id))delete S.notified[k]});Object.assign(r,d)}
-  else S.rdvs.push({id:uid(),...d});
+  else{S.rdvs.push({id:uid(),...d});evt('nouveau rendez-vous : '+t+' le '+fmtD(d.date))}
   save();closeModal();renderAll();toast('Rendez-vous enregistré ✅');
 }
 function delRdv(id){S.rdvs=S.rdvs.filter(x=>x.id!==id);save();closeModal();renderAll()}
@@ -957,6 +970,200 @@ function icsRdv(id){
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'}));a.download='rdv.ics';document.body.appendChild(a);a.click();a.remove();toast('Ouvre le fichier pour l\'ajouter')}catch(err){toast('Impossible ici')}
 }
 
+/* ---------- Synchro famille ---------- */
+const SKEY='suivi-diabete-sync';
+let SC=null;try{SC=JSON.parse(localStorage.getItem(SKEY))}catch(e){}
+function saveSC(){try{SC?localStorage.setItem(SKEY,JSON.stringify(SC)):localStorage.removeItem(SKEY)}catch(e){}}
+const DEV=(()=>{try{let d=localStorage.getItem('suivi-diabete-dev');if(!d){d=uid();localStorage.setItem('suivi-diabete-dev',d)}return d}catch(e){return uid()}})();
+const SH_ARR=['stock','ordos','hist','commandes','rdvs','journal'],SH_OBJ=['enfant','capteur','pod','reglages'];
+const clone=x=>JSON.parse(JSON.stringify(x));
+function shared(o){const r={};SH_ARR.forEach(k=>r[k]=o[k]||[]);SH_OBJ.forEach(k=>r[k]=o[k]);r.del=o.del||{};r.meta=o.meta||{};return r}
+function strip(o){const c=Object.assign({},o);delete c.u;return JSON.stringify(c)}
+let SNAP=null;
+function stamp(){
+  S.del=S.del||{};S.meta=S.meta||{};S.journal=S.journal||[];
+  if(!SNAP){SNAP=clone(shared(S));return false}
+  const now=Date.now();let ch=false;
+  SH_ARR.forEach(k=>{const prev={};(SNAP[k]||[]).forEach(x=>prev[x.id]=x);const cur=new Set();
+    (S[k]||[]).forEach(x=>{cur.add(x.id);const pv=prev[x.id];if(!pv||strip(pv)!==strip(x)){x.u=now;ch=true}});
+    Object.keys(prev).forEach(id=>{if(!cur.has(id)){S.del[id]=now;ch=true}})});
+  SH_OBJ.forEach(k=>{if(JSON.stringify(SNAP[k])!==JSON.stringify(S[k])){S.meta[k]=now;ch=true}});
+  SNAP=clone(shared(S));return ch;
+}
+function mergeRemote(R){
+  const del=Object.assign({},S.del||{});Object.entries(R.del||{}).forEach(([id,t])=>{if(!del[id]||t>del[id])del[id]=t});
+  SH_ARR.forEach(k=>{const m={};(S[k]||[]).forEach(x=>m[x.id]=x);(R[k]||[]).forEach(x=>{const l=m[x.id];if(!l||(x.u||0)>(l.u||0))m[x.id]=x});
+    S[k]=Object.values(m).filter(x=>!(del[x.id]&&del[x.id]>=(x.u||0)))});
+  S.journal.sort((a,b)=>b.t-a.t);S.journal=S.journal.slice(0,100);
+  S.del=del;S.meta=S.meta||{};
+  SH_OBJ.forEach(k=>{const rt=(R.meta||{})[k]||0;if(rt>(S.meta[k]||0)&&R[k]!==undefined){S[k]=R[k];S.meta[k]=rt}});
+}
+function evt(txt){S.journal=S.journal||[];const j={id:uid(),t:Date.now(),who:(SC&&SC.name)||'',dev:DEV,txt};S.journal.unshift(j);S.journal=S.journal.slice(0,100);if(SC&&SC.code){SC.pend=(SC.pend||[]).concat(j.id);saveSC()}}
+/* chiffrement */
+const tenc=new TextEncoder(),tdec=new TextDecoder();
+function toB64(buf){const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)}
+function fromB64(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u}
+let KC={};
+async function cryptoKey(code){if(KC.code===code&&KC.key)return KC.key;const km=await crypto.subtle.importKey('raw',tenc.encode(code),'PBKDF2',false,['deriveKey']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:tenc.encode('suivi-diabete-famille-v1'),iterations:150000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);KC={code,key};return key}
+async function tokenOf(code){const h=await crypto.subtle.digest('SHA-256',tenc.encode('auth|'+code));return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+async function encryptData(o){const iv=crypto.getRandomValues(new Uint8Array(12));const c=await crypto.subtle.encrypt({name:'AES-GCM',iv},await cryptoKey(SC.code),tenc.encode(JSON.stringify(o)));return toB64(iv)+'.'+toB64(c)}
+async function decryptData(str){const [a,b]=str.split('.');const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:fromB64(a)},await cryptoKey(SC.code),fromB64(b));return JSON.parse(tdec.decode(p))}
+function newCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r=crypto.getRandomValues(new Uint8Array(24));let c='';r.forEach((x,i)=>{c+=A[x%A.length];if(i%4===3&&i<23)c+='-'});return c}
+/* réseau */
+async function api(p){
+  const t=await tokenOf(SC.code);
+  const r=await fetch(SC.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({t},p)),redirect:'follow'});
+  const j=await r.json();if(!j.ok&&j.err!=='conflict')throw new Error(j.err||'erreur');return j;
+}
+let syncing=false,syncState='',syncErr='',sTimer=0;
+function schedSync(){clearTimeout(sTimer);sTimer=setTimeout(()=>syncNow(),1500)}
+function setSync(st,e){syncState=st;syncErr=e?String(e.message||e):'';renderSync()}
+async function applyRemote(g){
+  if(g.data){const R=await decryptData(g.data);const seen=new Set((S.journal||[]).map(j=>j.id));
+    if(SC.fresh){SH_ARR.concat(SH_OBJ).forEach(k=>{if(R[k]!==undefined)S[k]=R[k]});S.del=R.del||{};S.meta=R.meta||{};SC.fresh=false}
+    else mergeRemote(R);
+    SNAP=clone(shared(S));persist();renderAll();
+    const news=(R.journal||[]).filter(j=>!seen.has(j.id)&&j.dev!==DEV&&Date.now()-j.t<864e5);
+    if(news.length&&SC.v>0){toast('🔄 '+(news[0].who||'Famille')+' : '+news[0].txt);news.slice(0,3).forEach(j=>notify('Suivi Diabète — '+(j.who||'Famille'),j.txt,'fam'+j.id))}
+  }else if(SC.fresh)SC.fresh=false;
+  SC.v=g.v;saveSC();
+}
+async function pushNow(){
+  for(let i=0;i<4;i++){
+    const ev=(S.journal||[]).filter(j=>(SC.pend||[]).includes(j.id)).map(j=>j.txt);
+    const r=await api({a:'put',base:SC.v,data:await encryptData(shared(S)),events:ev,who:SC.name||''});
+    if(r.ok){SC.v=r.v;SC.dirty=false;SC.pend=[];saveSC();return}
+    await applyRemote(r);
+  }
+  throw new Error('conflit');
+}
+async function syncNow(){
+  if(!SC||!SC.url||!SC.code||syncing)return;
+  if(!navigator.onLine){setSync('off');return}
+  syncing=true;setSync('busy');
+  try{
+    const r=await api({a:'v'});
+    if(r.v!==SC.v||SC.fresh)await applyRemote(await api({a:'get'}));
+    if(SC.dirty)await pushNow();
+    SC.last=Date.now();saveSC();setSync('ok');
+  }catch(e){setSync('err',e)}finally{syncing=false}
+}
+function ago(t){if(!t)return'jamais';const m=Math.round((Date.now()-t)/6e4);return m<1?"à l'instant":m<60?'il y a '+m+' min':'il y a '+Math.round(m/60)+' h'}
+function renderSync(){
+  const b=$('syncBox');if(!b)return;
+  if(!SC||!SC.url){b.innerHTML=`${SC&&SC.code?`<div class="alert o"><span>⏳</span><span>Installation commencée (étape 2/3)</span></div>`:''}
+    <button class="btn full" onclick="openCreate()">${SC&&SC.code?'Continuer':'Créer la synchro'} (1<sup>er</sup> téléphone)</button>
+    <button class="btn sec full" onclick="openJoin()">Rejoindre la famille</button>`;return}
+  const col={ok:'var(--ok)',busy:'var(--warn)',err:'var(--bad)',off:'var(--mut)'}[syncState]||'var(--mut)';
+  const lab={ok:'Synchronisé '+ago(SC.last),busy:'Synchronisation…',err:'Erreur : '+esc(syncErr),off:'Hors connexion'}[syncState]||'Synchronisé '+ago(SC.last);
+  b.innerHTML=`<div style="font-size:13.5px"><span class="sdot" style="background:${col}"></span>${lab}</div>
+  <div style="font-size:12.5px;color:var(--mut);margin-top:4px">Ce téléphone : <b>${esc(SC.name||'—')}</b></div>
+  <button class="btn full" onclick="syncNow()">🔄 Synchroniser maintenant</button>
+  <button class="btn sec full" onclick="openInvite()">📨 Ajouter un téléphone</button>
+  <button class="btn sec full" onclick="openSyncName()">✏️ Changer le nom de ce téléphone</button>
+  <button class="btn sec full" style="color:var(--bad)" onclick="openLeave()">Déconnecter ce téléphone</button>`;
+}
+function scriptCode(tok){return `// Suivi Diabète — synchro famille (script à coller dans script.google.com)
+// Les données arrivent déjà chiffrées : ce script ne peut pas les lire.
+const TOKEN = '${tok}';
+const EMAILS = ''; // ex : 'papa@gmail.com, maman@gmail.com, taylor@gmail.com' (laisser vide = pas de mail)
+
+function doGet(e){ return out({ok:false, err:'post'}); }
+function doPost(e){
+  var p = {}; try { p = JSON.parse(e.postData.contents); } catch (err) {}
+  if (!p.t || p.t !== TOKEN) return out({ok:false, err:'acces refuse'});
+  var props = PropertiesService.getScriptProperties();
+  if (p.a === 'v') return out({ok:true, v:Number(props.getProperty('V') || 0)});
+  var f = file_(props);
+  if (p.a === 'get') return out(Object.assign({ok:true}, JSON.parse(f.getBlob().getDataAsString())));
+  if (p.a === 'put') {
+    var lock = LockService.getScriptLock(); lock.waitLock(20000);
+    try {
+      var d = JSON.parse(f.getBlob().getDataAsString());
+      if (p.base !== d.v) return out({ok:false, err:'conflict', v:d.v, data:d.data});
+      var nd = {v:d.v + 1, data:p.data};
+      f.setContent(JSON.stringify(nd)); props.setProperty('V', String(nd.v));
+      if (EMAILS && p.events && p.events.length) {
+        var who = p.who ? p.who + ' : ' : '';
+        MailApp.sendEmail(EMAILS, 'Suivi Diabète — ' + who + p.events[0],
+          p.events.map(function(x){ return '• ' + who + x; }).join('\\n') + '\\n\\nOuvre l\\'appli pour voir le détail.');
+      }
+      return out({ok:true, v:nd.v});
+    } finally { lock.releaseLock(); }
+  }
+  return out({ok:false, err:'action'});
+}
+function file_(props){
+  var id = props.getProperty('FILE');
+  if (id) { try { return DriveApp.getFileById(id); } catch (e) {} }
+  var f = DriveApp.createFile('suivi-diabete-sync.json', JSON.stringify({v:0, data:null}), 'application/json');
+  props.setProperty('FILE', f.getId()); props.setProperty('V', '0'); return f;
+}
+function out(o){ return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+`}
+async function openCreate(){
+  if(!SC||!SC.code){SC={code:newCode(),name:'',v:0,dirty:true,pend:[]};saveSC()}
+  const tok=await tokenOf(SC.code);
+  modal(`<h3>🔄 Créer la synchro</h3>
+  <label>Nom de ce téléphone</label><input id="syN" value="${esc(SC.name||'')}" placeholder="Papa, Maman, Taylor…">
+  <div class="step"><div class="n">1</div><div>Va sur <b>script.google.com</b> (sur ordi c'est plus simple) → <b>Nouveau projet</b>. Efface tout et colle le script :
+    <button class="btn sec full" onclick="copyTxt(window._sc)">📋 Copier le script</button>
+    <div style="font-size:12px;color:var(--mut);margin-top:6px">Dans le script, mets vos adresses mail à la ligne <b>EMAILS</b> pour être prévenus par mail (facultatif).</div></div></div>
+  <div class="step"><div class="n">2</div><div><b>Déployer → Nouveau déploiement</b> → type <b>Application Web</b>.<br>Exécuter en tant que : <b>Moi</b> · Accès : <b>Tout le monde</b>.<br>Valide et autorise l'accès à ton compte, puis copie l'<b>URL de l'application Web</b>.</div></div>
+  <div class="step"><div class="n">3</div><div style="flex:1">Colle l'URL ici :<input id="syU" style="margin-top:6px" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(SC.url||'')}"></div></div>
+  <button class="btn full" onclick="connectCreate()">Connecter</button>
+  <button class="btn sec full" onclick="closeModal()">Plus tard</button>`);
+  window._sc=scriptCode(tok);
+}
+function copyTxt(t){navigator.clipboard.writeText(t).then(()=>toast('Copié ✅')).catch(()=>{modal(`<h3>Copie</h3><textarea rows="12" style="font-size:11px" readonly>${esc(t)}</textarea><button class="btn sec full" onclick="closeModal()">Fermer</button>`)})}
+async function connectCreate(){
+  const u=$('syU').value.trim(),n=$('syN').value.trim();
+  if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(u)){toast("L'URL doit commencer par https://script.google.com/");return}
+  SC.url=u;SC.name=n||'Téléphone';SC.dirty=true;saveSC();
+  try{const r=await api({a:'v'});SC.v=r.v;if(r.v>0)SC.fresh=false;saveSC();stamp();await syncNow();closeModal();if(syncState==='ok')toast('Synchro activée ✅');renderAll()}
+  catch(e){SC.url='';saveSC();toast('Connexion impossible : '+(e.message||e))}
+}
+function inviteStr(){return 'SD1-'+btoa(unescape(encodeURIComponent(JSON.stringify({u:SC.url,c:SC.code}))))}
+function openInvite(){
+  const inv=inviteStr(),link=location.origin+location.pathname+'#join='+encodeURIComponent(inv);
+  modal(`<h3>📨 Ajouter un téléphone</h3>
+  <div style="font-size:13.5px">Sur l'autre téléphone, ouvre l'appli → <b>Réglages → Synchro famille → Rejoindre la famille</b>, et colle ce code d'invitation :</div>
+  <div class="codebox">${esc(inv)}</div>
+  <button class="btn full" onclick="copyTxt('${inv}')">📋 Copier le code</button>
+  <button class="btn sec full" onclick="shareInv('${esc(link)}')">📤 Envoyer le lien (SMS, WhatsApp…)</button>
+  <div class="alert o" style="margin-top:12px"><span>🔒</span><span>Ce code donne accès à toutes les données de Taylor. Envoie-le uniquement à ta famille, et supprime le message une fois le téléphone connecté.</span></div>
+  <button class="btn sec full" onclick="closeModal()">Fermer</button>`);
+}
+function shareInv(link){const t='Suivi Diabète — lien pour connecter ton téléphone : '+link;if(navigator.share)navigator.share({text:t}).catch(()=>{});else copyTxt(t)}
+function openJoin(pre){
+  modal(`<h3>👨‍👩‍👦 Rejoindre la famille</h3>
+  <label>Nom de ce téléphone</label><input id="jN" placeholder="Papa, Maman, Taylor…">
+  <label>Code d'invitation</label><textarea id="jC" rows="3" style="font-size:12px" placeholder="SD1-…">${esc(pre||'')}</textarea>
+  <div class="alert o" style="margin-top:10px"><span>⚠️</span><span>Les données déjà sur ce téléphone seront remplacées par celles de la famille.</span></div>
+  <button class="btn full" onclick="doJoin()">Rejoindre</button>
+  <button class="btn sec full" onclick="closeModal()">Annuler</button>`);
+}
+async function doJoin(){
+  let o;try{o=JSON.parse(decodeURIComponent(escape(atob($('jC').value.trim().replace(/^SD1-/,'')))))}catch(e){toast('Code invalide');return}
+  if(!o.u||!o.c){toast('Code invalide');return}
+  SC={url:o.u,code:o.c,name:$('jN').value.trim()||'Téléphone',v:-1,fresh:true,dirty:false,pend:[]};saveSC();
+  toast('Connexion…');await syncNow();
+  if(syncState==='ok'){closeModal();toast('Téléphone connecté ✅');renderAll()}else{toast('Échec : '+syncErr);SC=null;saveSC();renderSync()}
+}
+function openSyncName(){modal(`<h3>Nom de ce téléphone</h3><input id="syN2" value="${esc(SC.name||'')}"><button class="btn full" onclick="SC.name=$('syN2').value.trim()||SC.name;saveSC();closeModal();renderSync()">Enregistrer</button><button class="btn sec full" onclick="closeModal()">Annuler</button>`)}
+function openLeave(){modal(`<h3>Déconnecter ce téléphone ?</h3><div style="font-size:14px;color:var(--mut)">Il garde ses données mais ne se synchronise plus. Les autres téléphones ne sont pas touchés.</div>
+  <button class="btn bad full" onclick="SC=null;saveSC();closeModal();renderSync();toast('Déconnecté')">Déconnecter</button><button class="btn sec full" onclick="closeModal()">Annuler</button>`)}
+function resetAll(){SC=null;saveSC();S=defaults();SNAP=null;stamp();persist();applyLook();closeModal();renderAll();toast('Données effacées')}
+function renderFam(){
+  const e=$('famAct');if(!e)return;const j=(S.journal||[]).slice(0,8);
+  e.innerHTML=SC&&SC.url&&j.length?`<div class="card"><b style="font-size:15.5px">👨‍👩‍👦 Activité de la famille</b>${j.map(x=>`<div class="fa"><b>${esc(x.who||'—')}</b> : ${esc(x.txt)}<br><span>${fmtDT(x.t)}</span></div>`).join('')}</div>`:'';
+}
+setInterval(()=>{if(document.visibilityState==='visible')syncNow()},30000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow()});
+window.addEventListener('online',()=>syncNow());
+(function(){const m=location.hash.match(/^#join=(.+)$/);if(m){history.replaceState(null,'',location.pathname);setTimeout(()=>openJoin(decodeURIComponent(m[1])),3300)}})();
+
 /* ---------- UI ---------- */
 function modal(h){$('modalBox').innerHTML=h;$('modal').classList.add('on')}
 function closeModal(){$('modal').classList.remove('on')}
@@ -967,11 +1174,13 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 });
 function renderAll(){
   $('today').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  renderKid();renderBanner();renderRdv();renderCmd();renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderStock();renderOrdo();renderHist();renderReg();
+  renderKid();renderBanner();renderSync();renderFam();renderRdv();renderCmd();renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderStock();renderOrdo();renderHist();renderReg();
 }
+stamp();
 applyLook();
 renderAll();
 runSplash();
+setTimeout(syncNow,800);
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 setInterval(()=>{renderDev('capteur');renderDev('pod');renderAlerts();renderAuto();renderBanner();checkNotifs()},60000);
 setTimeout(checkNotifs,1500);
