@@ -295,6 +295,7 @@ input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px
     <label>Alerte péremption / ordonnance (jours avant)</label><input type="number" id="rAlerte" min="1">
     <label>Alerte stock : moins de … jours de traitement</label><input type="number" id="rAutoJ" min="1">
     <label>Commande : prévoir du matériel pour … jours</label><input type="number" id="rCibleJ" min="1">
+    <label>Lien du formulaire de déclaration des capteurs défectueux</label><input type="url" id="rForm" placeholder="https://…">
     <button class="btn full" onclick="saveReg()">Enregistrer</button>
   </div>
   <div class="card">
@@ -336,7 +337,7 @@ function defaults(){return{
   enfant:{prenom:'',naissance:'',photo:'',insuline:'',notes:'',infNom:'',infTel:'',pedNom:'',pedTel:'',pedHop:''},
   capteur:{pose:null},
   pod:{pose:null},
-  reglages:{capJ:10,capG:12,podH:72,podG:8,alerte:30,autoJ:30,cibleJ:90},
+  reglages:{capJ:10,capG:12,podH:72,podG:8,alerte:30,autoJ:30,cibleJ:90,formCap:'https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=EiojAq_9fUi4MpJBIBzvUsLcioGC6uVJomsfUVk5HrFUNlUzRjZRMEJQTjdMWUxJSFozRk1RNjFRVy4u&origin=QRCode'},
   stock:[
     {id:uid(),cat:'Capteurs',nom:'Capteur Dexcom G7',qte:0,unite:'capteurs',seuil:3,per:'',lien:'capteur'},
     {id:uid(),cat:'Pompe',nom:'Pods Omnipod 5',qte:0,unite:'pods',seuil:10,per:'',lien:'pod'},
@@ -527,6 +528,7 @@ function alerts(){
     else if(s.st==='bad')a.push(['o',`<b>${n}</b> à changer dans ${fmtRest(s.restH)}`]);
   });
   lowAuto().forEach(([i,au])=>a.push([au<7?'r':'o',`<b>${esc(i.nom)}</b> : plus que ${au} j de traitement (jusqu'au ${untilD(au)})`]));
+  S.hist.filter(h=>h.defect&&h.type==='capteur'&&!h.formDone&&S.reglages.formCap).forEach(h=>a.push(['o',`<b>Formulaire capteur défectueux</b> du ${fmtD(h.fin||h.date)} à remplir`]));
   S.hist.filter(h=>h.defect&&!h.declared).forEach(h=>a.push(['o',`<b>Panne ${NOM[h.type]}</b> du ${fmtD(h.fin||h.date)} pas encore déclarée à l'infirmière`]));
   S.stock.forEach(i=>{
     if(i.qte<=i.seuil&&autonomie(i)==null)a.push([i.qte===0?'r':'o',`<b>${esc(i.nom)}</b> : ${i.qte===0?'plus de stock':'stock bas ('+i.qte+')'}`]);
@@ -655,7 +657,8 @@ function renderHist(){
     ${h.ref||h.lot?`<div class="ln">${h.ref?'Réf. '+esc(h.ref):''}${h.ref&&h.lot?' · ':''}${h.lot?'Lot <b style="font-size:12px">'+esc(h.lot)+'</b>':''}</div>`:''}
     ${port?`<div class="ln">${port}</div>`:''}
     ${h.defect?`<div class="ln" style="color:var(--bad)"><b style="font-size:12px">${esc(h.motif||'Panne')}</b>${h.dnote?' — '+esc(h.dnote):''}</div>
-    <div class="ln">${h.declared?`<span style="color:var(--ok);font-weight:700">✅ Déclarée à l'infirmière${h.declDate?' le '+fmtD(h.declDate):''}</span>`:`<span style="color:var(--warn);font-weight:700">⏳ Pas encore déclarée</span>`}</div>`:''}
+    <div class="ln">${h.declared?`<span style="color:var(--ok);font-weight:700">✅ Déclarée à l'infirmière${h.declDate?' le '+fmtD(h.declDate):''}</span>`:`<span style="color:var(--warn);font-weight:700">⏳ Pas encore déclarée</span>`}</div>
+    ${h.type==='capteur'?`<div class="ln">${h.formDone?'<span style="color:var(--ok);font-weight:700">✅ Formulaire envoyé</span>':'<span style="color:var(--warn);font-weight:700">📝 Formulaire à remplir</span>'}</div>`:''}`:''}
     ${h.note?`<div class="ln">${esc(h.note)}</div>`:''}</div></div>`}).join('');
 }
 function openHist(id){
@@ -672,7 +675,7 @@ function openHist(id){
     <label>Motif</label><select id="hM">${motifOpts(h.type,h.motif)}</select>
     <label>Détails</label><input id="hDN" value="${esc(h.dnote||'')}">
     <div class="chk"><input type="checkbox" id="hDecl" ${h.declared?'checked':''}><span>Panne déclarée à l'infirmière${h.declDate?' (le '+fmtD(h.declDate)+')':''}</span></div>
-    <button class="btn sec full" onclick="saveHist('${id}',true)">📨 Préparer le message pour l'infirmière</button>
+    <button class="btn sec full" onclick="saveHist('${id}',true)">📨 Déclarer (${h.type==='capteur'&&S.reglages.formCap?'formulaire + ':''}message infirmière)</button>
   </div>
   <button class="btn full" onclick="saveHist('${id}')">Enregistrer</button>
   ${enCours?'':`<button class="btn bad full" onclick="delHist('${id}')">Supprimer</button>`}
@@ -735,14 +738,14 @@ function renderReg(){
   document.querySelectorAll('#bgSeg button').forEach(b=>b.classList.toggle('on',b.dataset.b===L.bg));
   document.querySelectorAll('#spSeg button').forEach(b=>b.classList.toggle('on',b.dataset.s===(S.splash===false?'off':'on')));
   $('bgBox').style.display=L.bg==='custom'?'flex':'none';$('bgc').value=L.bgc;
-  const r=S.reglages;$('rCapJ').value=r.capJ;$('rCapG').value=r.capG;$('rPodH').value=r.podH;$('rPodG').value=r.podG;$('rAlerte').value=r.alerte;$('rAutoJ').value=r.autoJ;$('rCibleJ').value=r.cibleJ;renderNotifState();
+  const r=S.reglages;$('rCapJ').value=r.capJ;$('rCapG').value=r.capG;$('rPodH').value=r.podH;$('rPodG').value=r.podG;$('rAlerte').value=r.alerte;$('rAutoJ').value=r.autoJ;$('rCibleJ').value=r.cibleJ;$('rForm').value=r.formCap||'';renderNotifState();
 }
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setLook('mode',b.dataset.m));
 document.querySelectorAll('#bgSeg button').forEach(b=>b.onclick=()=>setLook('bg',b.dataset.b));
 document.querySelectorAll('#spSeg button').forEach(b=>b.onclick=()=>{S.splash=b.dataset.s==='on';save();renderReg()});
 $('cust1').oninput=e=>setLook('c1',e.target.value);$('cust2').oninput=e=>setLook('c2',e.target.value);$('bgc').oninput=e=>setLook('bgc',e.target.value);
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyLook)}catch(e){}
-function saveReg(){S.reglages={capJ:+$('rCapJ').value||10,capG:+$('rCapG').value||0,podH:+$('rPodH').value||72,podG:+$('rPodG').value||0,alerte:+$('rAlerte').value||30,autoJ:+$('rAutoJ').value||30,cibleJ:+$('rCibleJ').value||90};save();renderAll();toast('Réglages enregistrés')}
+function saveReg(){S.reglages={capJ:+$('rCapJ').value||10,capG:+$('rCapG').value||0,podH:+$('rPodH').value||72,podG:+$('rPodG').value||0,alerte:+$('rAlerte').value||30,autoJ:+$('rAutoJ').value||30,cibleJ:+$('rCibleJ').value||90,formCap:$('rForm').value.trim()};save();renderAll();toast('Réglages enregistrés')}
 function exportData(){
   const txt=JSON.stringify(S,null,1),name='suivi-diabete-'+new Date().toISOString().slice(0,10)+'.json';
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Fichier exporté')}catch(e){}
@@ -844,13 +847,24 @@ function doRecu(id){
 }
 function delCmd(id){S.commandes=S.commandes.filter(x=>x.id!==id);save();renderCmd()}
 /* Déclaration de panne */
+function formOpened(id){const h=S.hist.find(x=>x.id===id);if(h&&!h.formAt){h.formAt=new Date().toISOString();save()}}
+function setFormDone(id,v){const h=S.hist.find(x=>x.id===id);if(!h)return;h.formDone=v;if(v)evt('formulaire capteur défectueux envoyé');save();renderAll()}
 function openDeclare(id){
   const h=S.hist.find(x=>x.id===id);if(!h)return;
   sendCtx={subject:`Déclaration de panne ${NOM[h.type]} — ${S.enfant.prenom||''}`.trim(),done:false,onSent:()=>{if(!h.declared)evt('panne déclarée à l\'infirmière');h.declared=true;h.declDate=new Date().toISOString();save();renderAll()}};
-  modal(`<h3>📨 Déclarer la panne à l'infirmière</h3>${msgUI()}
+  const fu=h.type==='capteur'&&S.reglages.formCap;
+  modal(`<h3>📨 Déclarer la panne</h3>
+  ${fu?`<div class="card" style="margin:0 0 6px;border:1.5px solid var(--p)"><b style="font-size:14.5px">📝 1. Formulaire capteur défectueux</b>
+    <div style="font-size:12.5px;color:var(--mut);margin-top:4px">Copie les infos du capteur, puis ouvre le formulaire pour les reporter.</div>
+    <div class="row" style="margin-top:10px"><button class="btn sec" style="flex:1" onclick="copyTxt(window._fi)">📋 Copier les infos</button>
+    <a class="btn" style="flex:1;text-align:center;text-decoration:none" href="${esc(S.reglages.formCap)}" target="_blank" rel="noopener" onclick="formOpened('${id}')">Ouvrir le formulaire ↗</a></div>
+    <div class="chk"><input type="checkbox" id="dfForm" ${h.formDone?'checked':''} onchange="setFormDone('${id}',this.checked)"><span>Formulaire envoyé</span></div></div>
+    <b style="font-size:14.5px;display:block;margin-top:12px">📨 2. Prévenir l'infirmière</b>`:''}
+  ${msgUI()}
   <button class="btn sec full" onclick="sendCtx.onSent();closeModal();toast('Marquée comme déclarée ✅')">✅ Marquer comme déclarée</button>
   <button class="btn sec full" onclick="closeModal()">Plus tard</button>`);
   const nm=h.type==='capteur'?'capteur Dexcom G7':'pod Omnipod 5';
+  window._fi=[`${S.enfant.prenom||''}${S.enfant.code?' — code patient '+S.enfant.code:''}`,`Capteur Dexcom G7`,h.ref?'Référence : '+h.ref:'',h.lot?'N° de lot : '+h.lot:'',`Posé le : ${fmtDT(h.date)}`,h.fin?`Retiré le : ${fmtDT(h.fin)} (porté ${fmtRest(hDuree(h))})`:'',`Motif : ${h.motif||'—'}`,h.dnote?'Détails : '+h.dnote:'',h.site?'Emplacement : '+h.site:''].filter(Boolean).join('\n');
   $('msgTxt').value=`${hello()}Je vous signale une panne de ${nm} pour ${who()}.\n\n- Posé le : ${fmtDT(h.date)}\n- Retiré le : ${h.fin?fmtDT(h.fin):'—'}${h.fin?' (porté '+fmtRest(hDuree(h))+')':''}\n- Motif : ${h.motif||'—'}${h.dnote?'\n- Détails : '+h.dnote:''}${h.ref?'\n- Référence : '+h.ref:''}${h.lot?'\n- N° de lot : '+h.lot:''}${h.site?'\n- Emplacement : '+h.site:''}${sign()}`;
 }
 /* Notifications */
