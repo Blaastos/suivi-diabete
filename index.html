@@ -555,8 +555,10 @@ function renderAuto(){
   const jc=cap?Math.floor(cap.qte*r.capJ+(sc.none?0:Math.max(0,sc.restH/24))):0;
   const jp=pod?Math.floor((pod.qte*r.podH+(sp.none?0:Math.max(0,sp.restH)))/24):0;
   const until=j=>{const d=new Date();d.setDate(d.getDate()+j);return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})};
-  $('cAuto').innerHTML=`<div><b>${jc} j</b><span>Capteurs (${cap?cap.qte:0} en stock)<br>jusqu'au ${until(jc)}</span></div>
-  <div><b>${jp} j</b><span>Pods (${pod?pod.qte:0} en stock)<br>jusqu'au ${until(jp)}</span></div>`;
+  const rc=sc.none?0:Math.max(0,sc.restH/24),rp=sp.none?0:Math.max(0,sp.restH/24);
+  const det=(q,u,r,n)=>`<span style="font-size:11px;margin-top:4px">${q} × ${String(u).replace('.',',')} j${r>0?` + ${r>=1?Math.floor(r)+' j':Math.round(r*24)+' h'} du ${n} en cours`:''}</span>`;
+  $('cAuto').innerHTML=`<div><b>${jc} j</b><span>Capteurs (${cap?cap.qte:0} en stock)<br>jusqu'au ${until(jc)}</span>${det(cap?cap.qte:0,r.capJ,rc,'capteur')}</div>
+  <div><b>${jp} j</b><span>Pods (${pod?pod.qte:0} en stock)<br>jusqu'au ${until(jp)}</span>${det(pod?pod.qte:0,+(r.podH/24).toFixed(1),rp,'pod')}</div>`;
 }
 
 /* ---------- Stock ---------- */
