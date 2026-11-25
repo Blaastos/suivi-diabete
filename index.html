@@ -636,17 +636,8 @@ function delOrdo(id){S.ordos=S.ordos.filter(x=>x.id!==id);save();closeModal();re
 /* ---------- Historique ---------- */
 let hFilt='tous';
 function hDuree(h){if(!h.fin)return null;return (new Date(h.fin)-new Date(h.date))/36e5}
-function renderHist(){
-  const st=t=>{const a=S.hist.filter(h=>h.type===t),d=a.filter(h=>h.defect).length;return{n:a.length,d,p:a.length?Math.round(d/a.length*100):0}};
-  const c=st('capteur'),p=st('pod');
-  $('histStat').innerHTML=`<div><b>${c.d} <small style="font-size:13px;color:var(--mut)">/ ${c.n}</small></b><span>Capteurs défectueux${c.n?' ('+c.p+' %)':''}</span></div>
-  <div><b>${p.d} <small style="font-size:13px;color:var(--mut)">/ ${p.n}</small></b><span>Pods défectueux${p.n?' ('+p.p+' %)':''}</span></div>`;
-  const F={tous:'Tous',capteur:'📡 Capteurs',pod:'💧 Pods',defect:'⚠️ Défectueux'};
-  $('histFilt').innerHTML=Object.entries(F).map(([k,l])=>`<button class="${hFilt===k?'on':''}" onclick="hFilt='${k}';renderHist()">${l}</button>`).join('');
-  const list=S.hist.filter(h=>hFilt==='tous'||(hFilt==='defect'?h.defect:h.type===hFilt)).sort((x,y)=>new Date(y.date)-new Date(x.date));
-  if(!list.length){$('histList').innerHTML=`<div class="card empty">Rien pour l'instant</div>`;return}
-  const r=S.reglages;
-  $('histList').innerHTML=list.map(h=>{
+function hCard(h){
+    const r=S.reglages;
     const enCours=S[h.type].hid===h.id||(!h.fin&&S[h.type].pose===h.date);
     const du=hDuree(h), prevu=h.type==='capteur'?r.capJ*24:r.podH;
     let dl='';
@@ -661,7 +652,43 @@ function renderHist(){
     ${h.defect?`<div class="ln" style="color:var(--bad)"><b style="font-size:12px">${esc(h.motif||'Panne')}</b>${h.dnote?' — '+esc(h.dnote):''}</div>
     <div class="ln">${h.declared?`<span style="color:var(--ok);font-weight:700">✅ Déclarée à l'infirmière${h.declDate?' le '+fmtD(h.declDate):''}</span>`:`<span style="color:var(--warn);font-weight:700">⏳ Pas encore déclarée</span>`}</div>
     ${h.type==='capteur'?`<div class="ln">${h.formDone?'<span style="color:var(--ok);font-weight:700">✅ Formulaire envoyé</span>':'<span style="color:var(--warn);font-weight:700">📝 Formulaire à remplir</span>'}</div>`:''}`:''}
-    ${h.note?`<div class="ln">${esc(h.note)}</div>`:''}</div></div>`}).join('');
+    ${h.note?`<div class="ln">${esc(h.note)}</div>`:''}</div></div>`}
+function hSec(key,title,items,open,sub){
+  const isOpen=S.closed['h_'+key]===undefined?open:!S.closed['h_'+key];
+  return `<div class="card cat ${isOpen?'':'closed'}" style="padding:0">
+  <div class="cat-h" onclick="S.closed['h_${key}']=${isOpen};save();renderHist()"><span>${isOpen?'▾':'▸'} ${title}</span><span class="n">${items.length}${sub?' · '+sub:''}</span></div>
+  <div class="cat-b" style="padding:12px 12px 0">${items.length?items.map(hCard).join(''):'<div class="empty" style="padding:6px 0 18px">Rien ici</div>'}</div></div>`;
+}
+function renderHist(){
+  const st=t=>{const a=S.hist.filter(h=>h.type===t),d=a.filter(h=>h.defect).length;return{n:a.length,d,p:a.length?Math.round(d/a.length*100):0}};
+  const c=st('capteur'),p=st('pod');
+  $('histStat').innerHTML=`<div><b>${c.d} <small style="font-size:13px;color:var(--mut)">/ ${c.n}</small></b><span>Capteurs défectueux${c.n?' ('+c.p+' %)':''}</span></div>
+  <div><b>${p.d} <small style="font-size:13px;color:var(--mut)">/ ${p.n}</small></b><span>Pods défectueux${p.n?' ('+p.p+' %)':''}</span></div>`;
+  const F={tous:'Tous',capteur:'📡 Capteurs',pod:'💧 Pods',defect:'⚠️ Défectueux'};
+  $('histFilt').innerHTML=Object.entries(F).map(([k,l])=>`<button class="${hFilt===k?'on':''}" onclick="hFilt='${k}';renderHist()">${l}</button>`).join('');
+  const byDate=a=>a.slice().sort((x,y)=>new Date(y.date)-new Date(x.date));
+  const isCur=h=>S[h.type].hid===h.id||(!h.fin&&S[h.type].pose===h.date);
+  const all=byDate(S.hist);
+  if(!all.length){$('histList').innerHTML=`<div class="card empty">Rien pour l'instant</div>`;return}
+  const cur=all.filter(isCur).sort((a,b)=>a.type==='capteur'?-1:1);
+  const def=all.filter(h=>h.defect);
+  const nd=def.filter(h=>!h.declared||(h.type==='capteur'&&S.reglages.formCap&&!h.formDone)).length;
+  const prev=t=>all.filter(h=>h.type===t&&!isCur(h)&&!h.defect);
+  let html='';
+  if(hFilt==='tous'){
+    html=hSec('cur','🟢 En cours',cur,true)
+     +hSec('def','⚠️ Défectueux',def,true,nd?`<span style="color:var(--warn)">${nd} à déclarer</span>`:'')
+     +hSec('cap','📡 Capteurs terminés',prev('capteur'),false)
+     +hSec('pod','💧 Pods terminés',prev('pod'),false);
+  }else if(hFilt==='defect'){
+    html=hSec('defc','📡 Capteurs défectueux',def.filter(h=>h.type==='capteur'),true)+hSec('defp','💧 Pods défectueux',def.filter(h=>h.type==='pod'),true);
+  }else{
+    const t=hFilt,n=t==='capteur'?'Capteur':'Pod';
+    html=hSec(t+'cur','🟢 '+n+' en cours',cur.filter(h=>h.type===t),true)
+     +hSec(t+'def','⚠️ '+n+'s défectueux',def.filter(h=>h.type===t),true)
+     +hSec(t+'old','✅ '+n+'s terminés',prev(t),true);
+  }
+  $('histList').innerHTML=html;
 }
 function openHist(id){
   const h=S.hist.find(x=>x.id===id);if(!h)return;
@@ -1243,7 +1270,9 @@ function openLeave(){modal(`<h3>Déconnecter ce téléphone ?</h3><div style="fo
 function resetAll(){SC=null;saveSC();S=defaults();SNAP=null;stamp();persist();applyLook();closeModal();renderAll();toast('Données effacées')}
 function renderFam(){
   const e=$('famAct');if(!e)return;const j=(S.journal||[]).slice(0,8);
-  e.innerHTML=SC&&SC.url&&j.length?`<div class="card"><b style="font-size:15.5px">👨‍👩‍👦 Activité de la famille</b>${j.map(x=>`<div class="fa"><b>${esc(x.who||'—')}</b> : ${esc(x.txt)}<br><span>${fmtDT(x.t)}</span></div>`).join('')}</div>`:'';
+  const op=!!S.closed.h_famOpen;
+  e.innerHTML=SC&&SC.url&&j.length?`<div class="card cat ${op?'':'closed'}" style="padding:0"><div class="cat-h" onclick="S.closed.h_famOpen=${!op};save();renderFam()"><span>${op?'▾':'▸'} 👨‍👩‍👦 Activité de la famille</span><span class="n">${esc(j[0].who||'—')} · ${fmtD(j[0].t)}</span></div>
+  <div class="cat-b" style="padding:4px 16px">${j.map(x=>`<div class="fa"><b>${esc(x.who||'—')}</b> : ${esc(x.txt)}<br><span>${fmtDT(x.t)}</span></div>`).join('')}</div></div>`:'';
 }
 setInterval(()=>{if(document.visibilityState==='visible')syncNow()},30000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow()});
